@@ -6,6 +6,7 @@ enum diff_options {
 	diffNone = 0x0,
 	diffOld = 0x1,
 	diffNew = 0x2,
+	diffOutput = 0x40000000,
 	diffHelp = 0x80000000,
 };
 
@@ -13,6 +14,7 @@ const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params
 	{ L"?",		L"help",			nullptr,		L"show this help",						diffHelp },
 	{ L"n",		L"new",				L"<filename>",	L"specify new file(s)",					diffNew },
 	{ L"o",		L"old",				L"<filename>",	L"specify old file(s)",					diffOld },
+	{ L"O",		L"out",				L"<filename>",	L"output to file",						diffOutput },
 };
 
 void print_usage() {
@@ -44,13 +46,13 @@ struct resource {
 	map<wstring, map<wstring, vector<unsigned char>>> data;
 };
 resource load_resource(const wstring& file);
-void diff_strings(const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
+void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
 
 int wmain(int argc, wchar_t* argv[])
 {
 	int options = diffNone;
 	const wchar_t* err_arg = nullptr;
-	wstring new_files_pattern, old_files_pattern;
+	wstring new_files_pattern, old_files_pattern, output_file;
 
 	printf_s("\n ResDiff v0.1 https://github.com/WalkingCat/ResDiff\n\n");
 
@@ -60,12 +62,12 @@ int wmain(int argc, wchar_t* argv[])
 			diff_options curent_option = diffNone;
 			if ((arg[0] == '-') && (arg[1] == '-')) {
 				for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
-					if ((o->arg_alt != nullptr) && (_wcsicmp(arg + 2, o->arg_alt) == 0)) { curent_option = o->options; }
+					if ((o->arg_alt != nullptr) && (wcscmp(arg + 2, o->arg_alt) == 0)) { curent_option = o->options; }
 				}
 			}
 			else {
 				for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
-					if ((o->arg != nullptr) && (_wcsicmp(arg + 1, o->arg) == 0)) { curent_option = o->options; }
+					if ((o->arg != nullptr) && (wcscmp(arg + 1, o->arg) == 0)) { curent_option = o->options; }
 				}
 			}
 
@@ -80,7 +82,10 @@ int wmain(int argc, wchar_t* argv[])
 					if ((i + 1) < argc) old_files_pattern = argv[++i];
 					else valid = false;
 				}
-				else options = (options | curent_option);
+				else if (curent_option == diffOutput) {
+					if ((i + 1) < argc) output_file = argv[++i];
+					else valid = false;
+				} else options = (options | curent_option);
 			}
 			if (!valid && (err_arg == nullptr)) err_arg = arg;
 		}
@@ -93,18 +98,29 @@ int wmain(int argc, wchar_t* argv[])
 		return 0;
 	}
 
+	auto out = stdout;
+	if (!output_file.empty()) {
+		out = nullptr;
+		_wfopen_s(&out, output_file.c_str(), L"w, ccs=UTF-8");
+	}
+
+	if (out == nullptr) {
+		printf_s("can't open %ws for output", output_file.c_str());
+		return 0;
+	}
+
 	auto new_files = find_files(new_files_pattern.c_str());
 	auto old_files = find_files(old_files_pattern.c_str());
 
-	printf_s(" new files: %S%S\n", new_files_pattern.c_str(), !new_files.empty() ? L"" : L" (NOT EXISTS!)");
-	printf_s(" old files: %S%S\n", old_files_pattern.c_str(), !old_files.empty() ? L"" : L" (NOT EXISTS!)");
+	fwprintf_s(out, L" new files: %ws%ws\n", new_files_pattern.c_str(), !new_files.empty() ? L"" : L" (NOT EXISTS!)");
+	fwprintf_s(out, L" old files: %ws%ws\n", old_files_pattern.c_str(), !old_files.empty() ? L"" : L" (NOT EXISTS!)");
 
-	printf_s("\n");
+	fwprintf_s(out, L"\n");
 
 	if (new_files.empty() & old_files.empty()) return 0; // at least one of them must exists
 
-	printf_s(" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
-	printf_s("\n");
+	fwprintf_s(out, L" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
+	fwprintf_s(out, L"\n");
 
 	for (auto& new_pair : new_files) {
 		auto& new_file = new_pair.second;
@@ -146,13 +162,13 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				if (diff) {
 					if (!printed_file_name) {
-						printf_s("\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", new_file.c_str());
+						fwprintf_s(out, L"\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", new_file.c_str());
 						printed_file_name = true;
 					}
-					printf_s(" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
+					fwprintf_s(out, L" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
 
 					if (type_name == L"STRING") {
-						diff_strings(name, new_data, old_data);
+						diff_strings(out, name, new_data, old_data);
 					}
 				}
 			}
@@ -166,7 +182,7 @@ int wmain(int argc, wchar_t* argv[])
 				auto& name = old_data_pair.first;
 				auto& old_data = old_data_pair.second;
 				if (new_type.find(old_data_pair.first) == new_type.end()) {
-					printf_s(" - %ws # %ws\n", type_name.c_str(), name.c_str());
+					fwprintf_s(out, L" - %ws # %ws\n", type_name.c_str(), name.c_str());
 				}
 			}
 		}
@@ -175,7 +191,7 @@ int wmain(int argc, wchar_t* argv[])
 	for (auto& old_file_pair : old_files) {
 		auto& file_name = old_file_pair.first;
 		if (new_files.find(file_name) == new_files.end()) {
-			printf_s("\n- FILE %ws\n", file_name.c_str());
+			fwprintf_s(out, L"\n- FILE %ws\n", file_name.c_str());
 		}
 	}
 
@@ -273,7 +289,7 @@ resource load_resource(const wstring& file) {
 	return ret;
 }
 
-void diff_strings(const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data) {
+void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data) {
 	const WORD id_hi = (WORD) wcstoul(name.c_str(), nullptr, 10) - 1;
 	auto parse_strings = [&id_hi](const vector<unsigned char> * data) -> map<WORD, wstring> {
 		map<WORD, wstring> ret;
@@ -304,12 +320,12 @@ void diff_strings(const wstring& name, const vector<unsigned char> * new_data, c
 		auto& id = pair.first;
 		auto& new_str = pair.second;
 		if (old_strings.find(id) == old_strings.end()) {
-			printf_s("  + %d %ws\n", id, new_str.c_str());
+			fwprintf_s(out, L"  + %d %ws\n", id, new_str.c_str());
 		} else {
 			auto& old_str = old_strings[id];
 			if (new_str != old_str) {
-				printf_s("  * %d %ws\n", id, new_str.c_str());
-				printf_s("  $ %d %ws\n", id, old_str.c_str());
+				fwprintf_s(out, L"  * %d %ws\n", id, new_str.c_str());
+				fwprintf_s(out, L"  $ %d %ws\n", id, old_str.c_str());
 			}
 		}
 	}
@@ -317,7 +333,7 @@ void diff_strings(const wstring& name, const vector<unsigned char> * new_data, c
 		auto& id = pair.first;
 		auto& old_str = pair.second;
 		if (new_strings.find(id) == new_strings.end()) {
-			printf_s("  - %d %ws\n", id, old_str.c_str());
+			fwprintf_s(out, L"  - %d %ws\n", id, old_str.c_str());
 		}
 	}
 }
