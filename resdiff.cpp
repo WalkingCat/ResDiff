@@ -108,20 +108,24 @@ int wmain(int argc, wchar_t* argv[])
 
 	for (auto& new_pair : new_files) {
 		auto& new_file = new_pair.second;
+		auto new_res = load_resource(new_file);
+
+		bool file_is_new = false;
 		auto old_file_it = old_files.find(new_pair.first);
 		if (old_file_it == old_files.end()) {
 			if ((new_files.size() == 1) && (old_files.size() == 1)) {
-				old_file_it = old_files.begin();
+				old_file_it = old_files.begin(); // allows diff single files with different names
 			} else {
-				printf_s("\n+ FILE: %ws\n", new_file.c_str());
-				continue;
+				file_is_new = true;
 			}
 		}
-		auto& old_file = old_file_it->second;
+		resource old_res;
+		if (old_file_it != old_files.end()) {
+			auto& old_file = old_file_it->second;
+			old_res = load_resource(old_file);
+		}
 
-		auto old_res = load_resource(old_file);
-		auto new_res = load_resource(new_file);
-
+		bool printed_file_name = false;
 		for (auto& new_type_pair : new_res.data) {
 			auto& type_name = new_type_pair.first;
 			auto& new_type = new_type_pair.second;
@@ -130,24 +134,30 @@ int wmain(int argc, wchar_t* argv[])
 				auto& name = new_data_pair.first;
 				const vector<unsigned char> * new_data = &new_data_pair.second;
 				const vector<unsigned char> * old_data = nullptr;
-				bool diff = false;
+				bool diff = false, res_is_new = false;
 				if (old_type.find(name) == old_type.end()) {
-					printf_s(" + %ws # %ws\n", type_name.c_str(), name.c_str());
+					res_is_new = true;
 					diff = true;
 				} else {
 					old_data = &old_type[name];
 					if ((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size()) != 0)) {
-						printf_s(" * %ws # %ws\n", type_name.c_str(), name.c_str());
 						diff = true;
 					}
 				}
 				if (diff) {
+					if (!printed_file_name) {
+						printf_s("\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", new_file.c_str());
+						printed_file_name = true;
+					}
+					printf_s(" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
+
 					if (type_name == L"STRING") {
 						diff_strings(name, new_data, old_data);
 					}
 				}
 			}
 		}
+
 		for (auto& old_type_pair : old_res.data) {
 			auto& type_name = old_type_pair.first;
 			auto& old_type = old_type_pair.second;
@@ -159,6 +169,13 @@ int wmain(int argc, wchar_t* argv[])
 					printf_s(" - %ws # %ws\n", type_name.c_str(), name.c_str());
 				}
 			}
+		}
+	}
+
+	for (auto& old_file_pair : old_files) {
+		auto& file_name = old_file_pair.first;
+		if (new_files.find(file_name) == new_files.end()) {
+			printf_s("\n- FILE %ws\n", file_name.c_str());
 		}
 	}
 
