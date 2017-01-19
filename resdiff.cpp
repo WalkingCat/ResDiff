@@ -47,6 +47,7 @@ struct resource {
 };
 resource load_resource(const wstring& file);
 void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
+void diff_message_table(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
 
 int wmain(int argc, wchar_t* argv[])
 {
@@ -123,6 +124,7 @@ int wmain(int argc, wchar_t* argv[])
 	fwprintf_s(out, L"\n");
 
 	for (auto& new_pair : new_files) {
+		auto&file_name = new_pair.first;
 		auto& new_file = new_pair.second;
 		auto new_res = load_resource(new_file);
 
@@ -162,13 +164,15 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				if (diff) {
 					if (!printed_file_name) {
-						fwprintf_s(out, L"\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", new_file.c_str());
+						fwprintf_s(out, L"\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", file_name.c_str());
 						printed_file_name = true;
 					}
 					fwprintf_s(out, L" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
 
 					if (type_name == L"STRING") {
 						diff_strings(out, name, new_data, old_data);
+					} else if (type_name == L"MESSAGETABLE") {
+						diff_message_table(out, name, new_data, old_data);
 					}
 				}
 			}
@@ -298,16 +302,15 @@ void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * 
 			size_t pos = 0;
 			for (WORD n = 0; n < 16; ++n) {
 				const WORD id = (id_hi << 4) + n;
-				if ((pos + sizeof(WORD)) <= size) {
-					WORD len = *(WORD*)(data->data() + pos);
-					pos += sizeof(WORD);
-					if (len > 0) {
-						if ((pos + len * sizeof(wchar_t)) <= size) {
-							ret.emplace(make_pair(id, wstring((wchar_t*)(data->data() + pos), len)));
-							pos += len * 2;
-						} else break;
-					} else continue;
-				} else break;
+
+				if ((pos + sizeof(WORD)) > size) break;
+				const WORD len = *(WORD*)(data->data() + pos);
+				pos += sizeof(WORD);
+				if (len == 0) continue;
+
+				if ((pos + len * sizeof(wchar_t)) > size) break;
+				ret.emplace(make_pair(id, wstring((wchar_t*)(data->data() + pos), len)));
+				pos += len * sizeof(wchar_t);
 			}
 		}
 		return ret;
@@ -329,6 +332,7 @@ void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * 
 			}
 		}
 	}
+
 	for (auto& pair : old_strings) {
 		auto& id = pair.first;
 		auto& old_str = pair.second;
@@ -336,4 +340,8 @@ void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * 
 			fwprintf_s(out, L"  - %d %ws\n", id, old_str.c_str());
 		}
 	}
+}
+
+void diff_message_table(FILE * out, const wstring & name, const vector<unsigned char>* new_data, const vector<unsigned char>* old_data)
+{
 }
