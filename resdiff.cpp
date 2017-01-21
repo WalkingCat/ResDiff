@@ -43,8 +43,6 @@ map<wstring, wstring> find_files(const wchar_t* pattern);
 template<typename T, typename TFunc> void diff_maps(const T& new_map, const T& old_map, TFunc& func);
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
 
-void diff_message_table(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
-
 int wmain(int argc, wchar_t* argv[])
 {
 	int options = diffNone;
@@ -116,84 +114,63 @@ int wmain(int argc, wchar_t* argv[])
 
 	if (new_files.empty() & old_files.empty()) return 0; // at least one of them must exists
 
+	if ((new_files.size() == 1) && (old_files.size() == 1)) {
+		// allows diff single files with different names
+		auto& new_file_name = new_files.begin()->first;
+		auto& old_file_name = old_files.begin()->first;
+		if (new_file_name != old_file_name) {
+			auto diff_file_names = new_file_name + L" <=> " + old_file_name;
+			auto new_file = new_files.begin()->second;
+			new_files.clear();
+			new_files[diff_file_names] = new_file;
+			auto old_file = old_files.begin()->second;
+			old_files.clear();
+			old_files[diff_file_names] = old_file;
+		}
+
+	}
+
 	fwprintf_s(out, L" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
 	fwprintf_s(out, L"\n");
 
-	for (auto& new_pair : new_files) {
-		auto&file_name = new_pair.first;
-		auto& new_file = new_pair.second;
-		auto new_res = load_resource(new_file);
+	diff_maps(new_files, old_files, [&](const wstring& file_name, const wstring * new_file, const wstring * old_file) {
+		if (new_file != nullptr) {
+			auto new_res = load_resource(*new_file);
 
-		bool file_is_new = false;
-		auto old_file_it = old_files.find(new_pair.first);
-		if (old_file_it == old_files.end()) {
-			if ((new_files.size() == 1) && (old_files.size() == 1)) {
-				old_file_it = old_files.begin(); // allows diff single files with different names
-			} else {
-				file_is_new = true;
+			resource old_res;
+			if (old_file != nullptr) {
+				old_res = load_resource(*old_file);
 			}
-		}
-		resource old_res;
-		if (old_file_it != old_files.end()) {
-			auto& old_file = old_file_it->second;
-			old_res = load_resource(old_file);
-		}
 
-		bool printed_file_name = false;
-		for (auto& new_type_pair : new_res.data) {
-			auto& type_name = new_type_pair.first;
-			auto& new_type = new_type_pair.second;
-			auto& old_type = old_res.data[type_name];
-			for (auto& new_data_pair : new_type) {
-				auto& name = new_data_pair.first;
-				const vector<unsigned char> * new_data = &new_data_pair.second;
-				const vector<unsigned char> * old_data = nullptr;
-				bool diff = false, res_is_new = false;
-				if (old_type.find(name) == old_type.end()) {
-					res_is_new = true;
-					diff = true;
-				} else {
-					old_data = &old_type[name];
-					if ((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size()) != 0)) {
-						diff = true;
+			bool printed_file_name = false;
+			diff_maps(new_res.data, old_res.data, [&](const wstring& type_name, const std::map<std::wstring, std::vector<unsigned char>> * new_type, const std::map<std::wstring, std::vector<unsigned char>> * old_type) {
+				diff_maps(new_type ? *new_type : std::map<std::wstring, std::vector<unsigned char>>(), old_type ? *old_type : std::map<std::wstring, std::vector<unsigned char>>(),
+					[&](const wstring& name, const std::vector<unsigned char> * new_data, const std::vector<unsigned char> * old_data) {
+					if (new_data) {
+						const bool diff = (old_data == nullptr) ||
+							((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size())));
+						if (diff) {
+							if (!printed_file_name) {
+								fwprintf_s(out, L"\n%ws FILE: %ws\n", (old_file == nullptr) ? L"+" : L"*", file_name.c_str());
+								printed_file_name = true;
+							}
+							fwprintf_s(out, L" %ws %ws # %ws\n", (old_data == nullptr) ? L"+" : L"*", type_name.c_str(), name.c_str());
+
+							if (type_name == L"STRING") {
+								diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
+							} else if (type_name == L"MESSAGETABLE") {
+								diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
+							}
+						}
+					} else {
+						fwprintf_s(out, L" - %ws # %ws\n", type_name.c_str(), name.c_str());
 					}
-				}
-				if (diff) {
-					if (!printed_file_name) {
-						fwprintf_s(out, L"\n%ws FILE: %ws\n", file_is_new ? L"+" : L"*", file_name.c_str());
-						printed_file_name = true;
-					}
-					fwprintf_s(out, L" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
-
-					if (type_name == L"STRING") {
-						diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
-					} else if (type_name == L"MESSAGETABLE") {
-						diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
-					}
-				}
-			}
-		}
-
-		for (auto& old_type_pair : old_res.data) {
-			auto& type_name = old_type_pair.first;
-			auto& old_type = old_type_pair.second;
-			auto& new_type = new_res.data[type_name];
-			for (auto& old_data_pair : old_type) {
-				auto& name = old_data_pair.first;
-				auto& old_data = old_data_pair.second;
-				if (new_type.find(old_data_pair.first) == new_type.end()) {
-					fwprintf_s(out, L" - %ws # %ws\n", type_name.c_str(), name.c_str());
-				}
-			}
-		}
-	}
-
-	for (auto& old_file_pair : old_files) {
-		auto& file_name = old_file_pair.first;
-		if (new_files.find(file_name) == new_files.end()) {
+				});
+			});
+		} else {
 			fwprintf_s(out, L"\n- FILE %ws\n", file_name.c_str());
 		}
-	}
+	});
 
     return 0;
 }
