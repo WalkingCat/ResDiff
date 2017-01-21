@@ -100,7 +100,7 @@ int wmain(int argc, wchar_t* argv[])
 	}
 
 	if (out == nullptr) {
-		printf_s("can't open %ws for output", output_file.c_str());
+		printf_s("can't open %ws for output\n", output_file.c_str());
 		return 0;
 	}
 
@@ -127,49 +127,41 @@ int wmain(int argc, wchar_t* argv[])
 			old_files.clear();
 			old_files[diff_file_names] = old_file;
 		}
-
 	}
 
 	fwprintf_s(out, L" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
-	fwprintf_s(out, L"\n");
 
 	diff_maps(new_files, old_files, [&](const wstring& file_name, const wstring * new_file, const wstring * old_file) {
-		if (new_file != nullptr) {
-			auto new_res = load_resource(*new_file);
-
-			resource old_res;
-			if (old_file != nullptr) {
-				old_res = load_resource(*old_file);
-			}
-
-			bool printed_file_name = false;
-			diff_maps(new_res.data, old_res.data, [&](const wstring& type_name, const std::map<std::wstring, std::vector<unsigned char>> * new_type, const std::map<std::wstring, std::vector<unsigned char>> * old_type) {
-				diff_maps(new_type ? *new_type : std::map<std::wstring, std::vector<unsigned char>>(), old_type ? *old_type : std::map<std::wstring, std::vector<unsigned char>>(),
-					[&](const wstring& name, const std::vector<unsigned char> * new_data, const std::vector<unsigned char> * old_data) {
-					if (new_data) {
-						const bool diff = (old_data == nullptr) ||
-							((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size())));
-						if (diff) {
-							if (!printed_file_name) {
-								fwprintf_s(out, L"\n%ws FILE: %ws\n", (old_file == nullptr) ? L"+" : L"*", file_name.c_str());
-								printed_file_name = true;
-							}
-							fwprintf_s(out, L" %ws %ws # %ws\n", (old_data == nullptr) ? L"+" : L"*", type_name.c_str(), name.c_str());
-
-							if (type_name == L"STRING") {
-								diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
-							} else if (type_name == L"MESSAGETABLE") {
-								diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
-							}
-						}
-					} else {
-						fwprintf_s(out, L" - %ws # %ws\n", type_name.c_str(), name.c_str());
-					}
-				});
-			});
-		} else {
+		if (new_file == nullptr) {
 			fwprintf_s(out, L"\n- FILE %ws\n", file_name.c_str());
+			return;
 		}
+		bool printed_file_name = false;
+		diff_maps(load_resource(*new_file), (old_file != nullptr) ? load_resource(*old_file) : resource_data(),
+			[&](const wstring& type_name, const resource_type_data * new_type, const resource_type_data * old_type) {
+			diff_maps(new_type ? *new_type : resource_type_data(), old_type ? *old_type : resource_type_data(),
+				[&](const wstring& name, const std::vector<unsigned char> * new_data, const std::vector<unsigned char> * old_data) {
+				if (new_data == nullptr) {
+					fwprintf_s(out, L" - %ws # %ws\n", type_name.c_str(), name.c_str());
+					return;
+				}
+				const bool diff = (old_data == nullptr) ||
+					((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size())));
+				if (diff) {
+					if (!printed_file_name) {
+						fwprintf_s(out, L"\n%ws FILE: %ws\n", (old_file == nullptr) ? L"+" : L"*", file_name.c_str());
+						printed_file_name = true;
+					}
+					fwprintf_s(out, L" %ws %ws # %ws\n", (old_data == nullptr) ? L"+" : L"*", type_name.c_str(), name.c_str());
+
+					if (type_name == L"STRING") {
+						diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
+					} else if (type_name == L"MESSAGETABLE") {
+						diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
+					}
+				}
+			});
+		});
 	});
 
     return 0;

@@ -3,12 +3,12 @@
 
 using namespace std;
 
-resource load_resource(const wstring& file) {
-	resource ret;
+resource_data load_resource(const wstring& file) {
+	resource_data ret;
 	auto module = LoadLibraryExW(file.c_str(), NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
 	if (module != NULL) {
 		EnumResourceTypesW(module, [](HMODULE hModule, LPTSTR lpszType, LONG_PTR lParam) -> BOOL {
-			auto& rsrc = *(resource*)lParam;
+			auto& rsrc = *(resource_data*)lParam;
 			bool ignore = false;
 			if (IS_INTRESOURCE(lpszType)) {
 				switch ((int)lpszType) {
@@ -58,8 +58,8 @@ resource load_resource(const wstring& file) {
 					if (hrsrc != NULL) {
 						auto res = LockResource(LoadResource(hModule, hrsrc));
 						auto size = SizeofResource(hModule, hrsrc);
-						auto& rsrc = *(resource*)lParam;
-						auto& data = rsrc.data[type_name][name];
+						auto& rsrc = *(resource_data*)lParam;
+						auto& data = rsrc[type_name][name];
 						data.resize(size);
 						memcpy_s(data.data(), data.size(), res, size);
 					}
