@@ -1,5 +1,5 @@
 #include "stdafx.h"
-
+#include "resutils.h"
 using namespace std;
 
 enum diff_options {
@@ -40,13 +40,9 @@ void print_usage() {
 }
 
 map<wstring, wstring> find_files(const wchar_t* pattern);
+template<typename T, typename TFunc> void diff_maps(const T& new_map, const T& old_map, TFunc& func);
+void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
 
-struct resource {
-	bool loaded;
-	map<wstring, map<wstring, vector<unsigned char>>> data;
-};
-resource load_resource(const wstring& file);
-void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
 void diff_message_table(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data);
 
 int wmain(int argc, wchar_t* argv[])
@@ -170,9 +166,9 @@ int wmain(int argc, wchar_t* argv[])
 					fwprintf_s(out, L" %ws %ws # %ws\n", res_is_new ? L"+" : L"*", type_name.c_str(), name.c_str());
 
 					if (type_name == L"STRING") {
-						diff_strings(out, name, new_data, old_data);
+						diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
 					} else if (type_name == L"MESSAGETABLE") {
-						diff_message_table(out, name, new_data, old_data);
+						diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
 					}
 				}
 			}
@@ -222,126 +218,33 @@ map<wstring, wstring> find_files(const wchar_t * pattern)
 	return ret;
 }
 
-resource load_resource(const wstring& file) {
-	resource ret;
-	auto module = LoadLibraryExW(file.c_str(), NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-	ret.loaded = (module != NULL);
-	if (ret.loaded) {
-		EnumResourceTypesW(module, [](HMODULE hModule, LPTSTR lpszType, LONG_PTR lParam) -> BOOL {
-			auto& rsrc = *(resource*)lParam;
-			bool ignore = false;
-			if (IS_INTRESOURCE(lpszType)) {
-				switch ((int)lpszType) {
-				case (int)RT_VERSION:		ignore = true; break;
-				case (int)RT_MANIFEST:		ignore = true; break;
+void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map) {
+	diff_maps(new_map, old_map, [&](const wstring& id, const wstring* new_string, const wstring* old_string) {
+		if (new_string != nullptr) {
+			if (old_string != nullptr) {
+				if ((*new_string) != (*old_string)) {
+					fwprintf_s(out, L"  * %ws %ws\n", id.c_str(), new_string->c_str());
+					fwprintf_s(out, L"  $ %ws %ws\n", id.c_str(), old_string->c_str());
 				}
 			} else {
-				if (wcscmp(lpszType, L"MUI") == 0) ignore = true;
+				fwprintf_s(out, L"  + %ws %ws\n", id.c_str(), new_string->c_str());
 			}
-			if (!ignore) {
-				EnumResourceNamesW(hModule, lpszType, [](HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam) -> BOOL {
-					wstring type_name, name;
-					
-					if (IS_INTRESOURCE(lpszType)) {
-						switch ((int)lpszType) {
-						case (int)RT_CURSOR:		type_name = L"CURSOR"; break;
-						case (int)RT_BITMAP:		type_name = L"BITMAP"; break;
-						case (int)RT_ICON:			type_name = L"ICON"; break;
-						case (int)RT_MENU:			type_name = L"MENU"; break;
-						case (int)RT_DIALOG:		type_name = L"DIALOG"; break;
-						case (int)RT_STRING:		type_name = L"STRING"; break;
-						case (int)RT_FONTDIR:		type_name = L"FONTDIR"; break;
-						case (int)RT_FONT:			type_name = L"FONT"; break;
-						case (int)RT_ACCELERATOR:	type_name = L"ACCELERATOR"; break;
-						case (int)RT_RCDATA:		type_name = L"RCDATA"; break;
-						case (int)RT_MESSAGETABLE:	type_name = L"MESSAGETABLE"; break;
-						case (int)RT_GROUP_CURSOR:	type_name = L"GROUP_CURSOR"; break;
-						case (int)RT_GROUP_ICON:	type_name = L"GROUP_ICON"; break;
-						case (int)RT_HTML:			type_name = L"HTML"; break;
-						default: {
-								wchar_t buf[16] = {};
-								_itow_s((int)lpszType, buf, 10);
-								type_name = buf;
-								break;
-							}
-						}
-					} else {
-						type_name = wstring(L"\"") + lpszType + L"\"";
-					}
-
-					if (IS_INTRESOURCE(lpszName)) {
-						wchar_t buf[16] = {};
-						_itow_s((int)lpszName, buf, 10);
-						name = buf;
-					} else name = wstring(L"\"") + lpszName + L"\"";
-					auto hrsrc = FindResourceW(hModule, lpszName, lpszType);
-					if (hrsrc != NULL) {
-						auto res = LockResource(LoadResource(hModule, hrsrc));
-						auto size = SizeofResource(hModule, hrsrc);
-						auto& rsrc = *(resource*)lParam;
-						auto& data = rsrc.data[type_name][name];
-						data.resize(size);
-						memcpy_s(data.data(), data.size(), res, size);
-					}
-					return TRUE;
-				}, (LONG_PTR)&rsrc);
-			}
-			return TRUE;
-		}, (LONG_PTR) &ret);
-		FreeLibrary(module);
-	}
-	return ret;
+		} else if (old_string != nullptr) {
+			fwprintf_s(out, L"  - %ws %ws\n", id.c_str(), old_string->c_str());
+		}
+	});
 }
 
-void diff_strings(FILE* out, const wstring& name, const vector<unsigned char> * new_data, const vector<unsigned char> * old_data) {
-	const WORD id_hi = (WORD) wcstoul(name.c_str(), nullptr, 10) - 1;
-	auto parse_strings = [&id_hi](const vector<unsigned char> * data) -> map<WORD, wstring> {
-		map<WORD, wstring> ret;
-		if (data != nullptr) {
-			const size_t size = data->size();
-			size_t pos = 0;
-			for (WORD n = 0; n < 16; ++n) {
-				const WORD id = (id_hi << 4) + n;
-
-				if ((pos + sizeof(WORD)) > size) break;
-				const WORD len = *(WORD*)(data->data() + pos);
-				pos += sizeof(WORD);
-				if (len == 0) continue;
-
-				if ((pos + len * sizeof(wchar_t)) > size) break;
-				ret.emplace(make_pair(id, wstring((wchar_t*)(data->data() + pos), len)));
-				pos += len * sizeof(wchar_t);
-			}
-		}
-		return ret;
-	};
-	
-	auto new_strings = parse_strings(new_data);
-	auto old_strings = parse_strings(old_data);
-
-	for (auto& pair : new_strings) {
-		auto& id = pair.first;
-		auto& new_str = pair.second;
-		if (old_strings.find(id) == old_strings.end()) {
-			fwprintf_s(out, L"  + %d %ws\n", id, new_str.c_str());
-		} else {
-			auto& old_str = old_strings[id];
-			if (new_str != old_str) {
-				fwprintf_s(out, L"  * %d %ws\n", id, new_str.c_str());
-				fwprintf_s(out, L"  $ %d %ws\n", id, old_str.c_str());
-			}
-		}
-	}
-
-	for (auto& pair : old_strings) {
-		auto& id = pair.first;
-		auto& old_str = pair.second;
-		if (new_strings.find(id) == new_strings.end()) {
-			fwprintf_s(out, L"  - %d %ws\n", id, old_str.c_str());
-		}
-	}
-}
-
-void diff_message_table(FILE * out, const wstring & name, const vector<unsigned char>* new_data, const vector<unsigned char>* old_data)
+template<typename T, typename TFunc>
+void diff_maps(const T & new_map, const T & old_map, TFunc & func)
 {
+	for (auto& new_pair : new_map) {
+		auto& old_it = old_map.find(new_pair.first);
+		func(new_pair.first, &new_pair.second, old_it == old_map.end() ? nullptr : &old_it->second);
+	}
+	for (auto& old_pair : old_map) {
+		if (new_map.find(old_pair.first) == new_map.end()) {
+			func(old_pair.first, nullptr, &old_pair.second);
+		}
+	}
 }
