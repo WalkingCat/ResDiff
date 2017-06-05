@@ -20,7 +20,7 @@ resource_data load_resource(const wstring& file) {
 				if (wcscmp(lpszType, L"MUI") == 0) ignore = true;
 			}
 			if (!ignore) {
-				EnumResourceNamesW(hModule, lpszType, [](HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam) -> BOOL {
+				EnumResourceNamesExW(hModule, lpszType, [](HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam) -> BOOL {
 					wstring type_name, name;
 
 					if (IS_INTRESOURCE(lpszType)) {
@@ -65,7 +65,7 @@ resource_data load_resource(const wstring& file) {
 						memcpy_s(data.data(), data.size(), res, size);
 					}
 					return TRUE;
-				}, (LONG_PTR)&rsrc);
+				}, (LONG_PTR)&rsrc, RESOURCE_ENUM_LN, 0);
 			}
 			return TRUE;
 		}, (LONG_PTR)&ret);
