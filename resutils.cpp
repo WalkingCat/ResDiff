@@ -114,9 +114,8 @@ std::map<std::wstring, std::wstring> parse_message_table(const std::vector<unsig
 				if (msg_entry->Flags == 1) {
 					ret[buf] = wstring((wchar_t*)msg_entry->Text, (msg_entry->Length - (msg_entry->Text - (PBYTE)msg_entry)) / sizeof(wchar_t));
 				} else {
-					printf_s("TODO: MESSAGE_RESOURCE_ENTRY.Flags = %d, .Length = %d\n", msg_entry->Flags, msg_entry->Length);
-					//static std::wstring_convert<std::codecvt<wchar_t, char, std::mbstate_t>> conv;
-					//ret[buf] = conv.from_bytes((const char*)&msg_entry->Text[0], (const char*)msg_entry->Text[msg_entry->Length - 1]);
+					static std::wstring_convert<std::codecvt<wchar_t, char, std::mbstate_t>> conv;
+					ret[buf] = conv.from_bytes((const char*)&msg_entry->Text[0], (const char*)&msg_entry->Text[msg_entry->Length - (msg_entry->Text - (PBYTE)msg_entry) - 1]);
 				}
 				msg_entry = (PMESSAGE_RESOURCE_ENTRY) ((PBYTE)msg_entry + msg_entry->Length);
 			}
