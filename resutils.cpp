@@ -18,6 +18,7 @@ resource_data load_resource(const wstring& file) {
 				}
 			} else {
 				if (wcscmp(lpszType, L"MUI") == 0) ignore = true;
+				if (wcscmp(lpszType, L"WEVT_TEMPLATE") == 0) ignore = true; //TODO
 			}
 			if (!ignore) {
 				EnumResourceNamesExW(hModule, lpszType, [](HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam) -> BOOL {
