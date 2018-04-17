@@ -179,7 +179,9 @@ map<wstring, wstring> find_files(const wchar_t * pattern)
 			if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
 				PathRemoveFileSpec(path);
 				PathCombine(path, path, fd.cFileName);
-				ret[fd.cFileName] = path;
+				wstring name = fd.cFileName;
+				for (auto& c : name) c = towlower(c);
+				ret[name] = path;
 			}
 		} while (::FindNextFile(find, &fd));
 		::FindClose(find);
