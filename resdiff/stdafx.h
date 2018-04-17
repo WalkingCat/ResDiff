@@ -9,6 +9,9 @@
 #include <memory>
 #include <map>
 
+#include "../witutils/diff_utils.h"
+#include "../witutils/find_files.h"
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 

@@ -22,7 +22,7 @@ void print_usage() {
 	for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
 		if (o->arg != nullptr) printf_s("\t-%S", o->arg); else printf_s("\t");
 
-		int len = 0;
+		size_t len = 0;
 		if (o->arg_alt != nullptr) {
 			len = wcslen(o->arg_alt);
 			printf_s("\t--%S", o->arg_alt);
@@ -39,8 +39,6 @@ void print_usage() {
 	}
 }
 
-map<wstring, wstring> find_files(const wchar_t* pattern);
-template<typename T, typename TFunc> void diff_maps(const T& new_map, const T& old_map, TFunc& func);
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
 
 int wmain(int argc, wchar_t* argv[])
@@ -167,28 +165,6 @@ int wmain(int argc, wchar_t* argv[])
     return 0;
 }
 
-map<wstring, wstring> find_files(const wchar_t * pattern)
-{
-	map<wstring, wstring> ret;
-	wchar_t path[MAX_PATH] = {};
-	wcscpy_s(path, pattern);
-	WIN32_FIND_DATA fd;
-	HANDLE find = ::FindFirstFile(pattern, &fd);
-	if (find != INVALID_HANDLE_VALUE) {
-		do {
-			if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
-				PathRemoveFileSpec(path);
-				PathCombine(path, path, fd.cFileName);
-				wstring name = fd.cFileName;
-				for (auto& c : name) c = towlower(c);
-				ret[name] = path;
-			}
-		} while (::FindNextFile(find, &fd));
-		::FindClose(find);
-	}
-	return ret;
-}
-
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map) {
 	diff_maps(new_map, old_map, [&](const wstring& id, const wstring* new_string, const wstring* old_string) {
 		if (new_string != nullptr) {
@@ -204,18 +180,4 @@ void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const ma
 			fwprintf_s(out, L"  - %ws %ws\n", id.c_str(), old_string->c_str());
 		}
 	});
-}
-
-template<typename T, typename TFunc>
-void diff_maps(const T & new_map, const T & old_map, TFunc & func)
-{
-	for (auto& new_pair : new_map) {
-		auto& old_it = old_map.find(new_pair.first);
-		func(new_pair.first, &new_pair.second, old_it == old_map.end() ? nullptr : &old_it->second);
-	}
-	for (auto& old_pair : old_map) {
-		if (new_map.find(old_pair.first) == new_map.end()) {
-			func(old_pair.first, nullptr, &old_pair.second);
-		}
-	}
 }
