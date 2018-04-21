@@ -196,7 +196,19 @@ int wmain(int argc, wchar_t* argv[])
 										if (type_name == L"STRING") {
 											diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
 										} else if (type_name == L"MESSAGETABLE") {
-											diff_string_maps(out, parse_message_table(new_data), parse_message_table(old_data));
+											diff_sequences(parse_message_table(new_data), parse_message_table(old_data),
+												[&](const wstring* new_message, const wstring* old_message) {
+													if (old_message == nullptr) {
+														if (new_message != nullptr) {
+															fwprintf_s(out, L"       + %ws", new_message->c_str());
+														}
+													} else {
+														if (new_message == nullptr) {
+															fwprintf_s(out, L"       - %ws", old_message->c_str());
+														}
+													}
+												}
+											);
 										}
 									}
 								}
