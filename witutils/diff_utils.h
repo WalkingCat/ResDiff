@@ -39,7 +39,7 @@ void diff_maps(const std::map<TKey, TValue>& new_map, const std::map<TKey, TValu
 
 template<typename TValue, typename TFunc>
 void diff_sequences(const std::vector<TValue>& new_seq, const std::vector<TValue>& old_seq, TFunc& func) {
-	// code derived fron DTL (BSD License) https://github.com/cubicdaiya/dtl
+	// code derived from DTL (BSD License) https://github.com/cubicdaiya/dtl
 
 	const bool swapped = (std::size(new_seq) > std::size(old_seq));
 	const std::vector<TValue> &A = (swapped ? old_seq : new_seq), &B = (swapped ? new_seq : old_seq);
@@ -84,16 +84,18 @@ void diff_sequences(const std::vector<TValue>& new_seq, const std::vector<TValue
 		r = p.k;
 	}
 
-	long long x = 0, y = 0; // cordinates
+	long long x = 0, y = 0; // coordinates
 	for (size_t i = epc.size(); i != 0; --i) {
 		const auto& p = epc[i - 1];
 		while ((x < p.x) || (y < p.y)) {
 			if ((p.y - p.x) >(y - x)) {
-				if (swapped) func(&B[size_t(y++)], nullptr); else func(nullptr, &B[size_t(y++)]);
+				if (swapped) func(&B[size_t(y)], nullptr); else func(nullptr, &B[size_t(y)]);
+				++y;
 			} else if ((p.y - p.x) < (y - x)) {
-				if (swapped) func(nullptr, &A[size_t(x++)]); else func(&A[size_t(x++)], nullptr);
+				if (swapped) func(nullptr, &A[size_t(x)]); else func(&A[size_t(x)], nullptr);
+				++x;
 			} else {
-				if (swapped) func(&B[size_t(y++)], &A[size_t(x++)]); else func(&A[size_t(x++)], &B[size_t(y++)]);
+				if (swapped) func(&B[size_t(y)], &A[size_t(x)]); else func(&A[size_t(x)], &B[size_t(y)]);
 				++x; ++y;
 			}
 		}

@@ -15,7 +15,7 @@ const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params
 	{ L"?",		L"help",			nullptr,		L"show this help",						diffHelp },
 	{ L"n",		L"new",				L"<filename>",	L"specify new file(s)",					diffNew },
 	{ L"o",		L"old",				L"<filename>",	L"specify old file(s)",					diffOld },
-	{ nullptr,	L"wcs",				nullptr,		L"folder is Windows Compoent Store",	diffWcs },
+	{ nullptr,	L"wcs",				nullptr,		L"folder is Windows Component Store",	diffWcs },
 	{ L"O",		L"out",				L"<filename>",	L"output to file",						diffOutput },
 };
 
