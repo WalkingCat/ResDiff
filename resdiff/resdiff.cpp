@@ -19,37 +19,39 @@ const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params
 	{ L"O",		L"out",				L"<filename>",	L"output to file",						diffOutput },
 };
 
-void print_usage() {
-	printf_s("\tUsage: resdiff [options]\n\n");
-	for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
-		if (o->arg != nullptr) printf_s("\t-%S", o->arg); else printf_s("\t");
+void print_usage(FILE* out) {
+	fwprintf_s(out, L" Usage: resdiff [options]\n\n");
+	for (auto o = begin(cmd_options); o != end(cmd_options); ++o) {
+		if (o->arg != nullptr) fwprintf_s(out, L" -%ws", o->arg); else fwprintf_s(out, L" ");
 
-		size_t len = 0;
+		int len = 0;
 		if (o->arg_alt != nullptr) {
 			len = wcslen(o->arg_alt);
-			printf_s("\t--%S", o->arg_alt);
-		}
-		else printf_s("\t");
+			fwprintf_s(out, L"\t--%ws", o->arg_alt);
+		} else fwprintf_s(out, L"\t");
 
-		if (len < 6) printf_s("\t");
+		if (len < 6) fwprintf_s(out, L"\t");
 
-		if (o->params_desc != nullptr) len += printf_s(" %S", o->params_desc);
+		if (o->params_desc != nullptr) len += fwprintf_s(out, L" %ws", o->params_desc);
 
-		if (len < 14) printf_s("\t");
+		if (len < 14) fwprintf_s(out, L"\t");
 
-		printf_s("\t: %S\n", o->description);
+		fwprintf_s(out, L"\t: %ws\n", o->description);
 	}
+	fwprintf_s(out, L"\n");
 }
 
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
 
 int wmain(int argc, wchar_t* argv[])
 {
+	auto out = stdout;
+
 	int options = diffNone;
 	const wchar_t* err_arg = nullptr;
 	wstring new_files_pattern, old_files_pattern, output_file;
 
-	printf_s("\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
+	fwprintf_s(out, L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
 
 	for (int i = 1; i < argc; ++i) {
 		const wchar_t* arg = argv[i];
@@ -89,18 +91,17 @@ int wmain(int argc, wchar_t* argv[])
 
 	if ((new_files_pattern.empty() && old_files_pattern.empty()) || (err_arg != nullptr) || (options & diffHelp)) {
 		if (err_arg != nullptr) printf_s("\tError in option: %S\n\n", err_arg);
-		print_usage();
+		print_usage(out);
 		return 0;
 	}
 
-	auto out = stdout;
 	if (!output_file.empty()) {
 		out = nullptr;
 		_wfopen_s(&out, output_file.c_str(), L"w, ccs=UTF-8");
 	}
 
 	if (out == nullptr) {
-		printf_s("can't open %ws for output\n", output_file.c_str());
+		wprintf_s(L"can't open %ws for output\n", output_file.c_str());
 		return 0;
 	}
 
@@ -222,6 +223,8 @@ int wmain(int argc, wchar_t* argv[])
 				fwprintf_s(out, L" %wc )\n", printed_component_prefix);
 		}
 	);
+
+	fwprintf_s(out, L"\n");
 
     return 0;
 }
