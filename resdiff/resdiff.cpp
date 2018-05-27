@@ -147,12 +147,12 @@ int wmain(int argc, wchar_t* argv[])
 	diff_maps(new_file_groups, old_file_groups,
 		[&](const wstring& group_name, const map<wstring, wstring>* new_files, const map<wstring, wstring>* old_files) {
 			bool printed_group_name = false;
-			wchar_t printed_component_prefix = L' ';
+			wchar_t printed_group_prefix = L' ';
 			auto print_group_name = [&](const wchar_t prefix) {
 				if (!printed_group_name) {
 					fwprintf_s(out, L"\n %wc %ws (\n", prefix, group_name.c_str());
 					printed_group_name = true;
-					printed_component_prefix = prefix;
+					printed_group_prefix = prefix;
 				}
 			};
 			
@@ -184,15 +184,16 @@ int wmain(int argc, wchar_t* argv[])
 						[&](const wstring& type_name, const resource_type_data * new_type, const resource_type_data * old_type) {
 							diff_maps(new_type ? *new_type : resource_type_data(), old_type ? *old_type : resource_type_data(),
 								[&](const wstring& name, const std::vector<unsigned char> * new_data, const std::vector<unsigned char> * old_data) {
-									if (new_data == nullptr) {
-										fwprintf_s(out, L"     - %ws # %ws\n", type_name.c_str(), name.c_str());
-										return;
-									}
-									const bool diff = (old_data == nullptr) ||
+									//if (new_data == nullptr) {
+									//	print_file_name('*');
+									//	fwprintf_s(out, L"     - %ws # %ws\n", type_name.c_str(), name.c_str());
+									//	return;
+									//}
+									const bool diff = (new_data == nullptr) || (old_data == nullptr) ||
 										((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size())));
 									if (diff) {
 										print_file_name('*');
-										fwprintf_s(out, L"     %ws %ws # %ws\n", (old_data == nullptr) ? L"+" : L"*", type_name.c_str(), name.c_str());
+										fwprintf_s(out, L"     %wc %ws # %ws\n", new_data ? old_data ? L'*' : L'+' : L'-', type_name.c_str(), name.c_str());
 
 										if (type_name == L"STRING") {
 											diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
@@ -220,7 +221,7 @@ int wmain(int argc, wchar_t* argv[])
 			);
 
 			if (printed_group_name)
-				fwprintf_s(out, L" %wc )\n", printed_component_prefix);
+				fwprintf_s(out, L" %wc )\n", printed_group_prefix);
 		}
 	);
 
@@ -229,19 +230,68 @@ int wmain(int argc, wchar_t* argv[])
     return 0;
 }
 
+const size_t find_linebreak(const wstring& str, size_t* pos = nullptr) {
+	auto ret = str.find_first_of(L"\r\n", pos ? *pos : 0);
+	if (pos) {
+		*pos = ret + 1;
+		if ((ret != wstring::npos) && (str[ret] == L'\r') && ((ret + 1) < str.size()) && (str[ret + 1] == L'\n')) {
+			*pos += 1; // treat \r\n as a whole
+		}
+	}
+	return ret;
+}
+
+bool is_multiline(const wstring& str) { return find_linebreak(str) != wstring::npos; }
+
+vector<wstring> get_lines(const wstring& str) {
+	vector<wstring> ret;
+	size_t start_pos = 0, next_start_pos = start_pos;
+	for (auto pos = find_linebreak(str, &next_start_pos); pos != wstring::npos; pos = find_linebreak(str, &next_start_pos)) {
+		ret.emplace_back(str.cbegin() + start_pos, str.cbegin() + pos);
+		start_pos = next_start_pos;
+	}
+	if(start_pos < str.size()) ret.emplace_back(str.cbegin() + start_pos, str.cend());
+	return ret;
+}
+
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map) {
 	diff_maps(new_map, old_map, [&](const wstring& id, const wstring* new_string, const wstring* old_string) {
 		if (new_string != nullptr) {
 			if (old_string != nullptr) {
 				if ((*new_string) != (*old_string)) {
-					fwprintf_s(out, L"       * %ws %ws\n", id.c_str(), new_string->c_str());
-					fwprintf_s(out, L"       $ %ws %ws\n", id.c_str(), old_string->c_str());
+					if (is_multiline(*new_string) || (is_multiline(*old_string))) {
+						fwprintf_s(out, L"       * %ws\n", id.c_str());
+						diff_sequences(get_lines(*new_string), get_lines(*old_string),
+							[&](const wstring* new_line, const wstring* old_line) {
+								fwprintf_s(out, L"         %lc %ws\n", new_line ? old_line ? L' ' : L'+' : L'-',
+									new_line ? new_line->c_str() : old_line->c_str());
+							}
+						);
+					} else {
+						fwprintf_s(out, L"       * %ws %ws\n", id.c_str(), new_string->c_str());
+						fwprintf_s(out, L"       $ %ws %ws\n", id.c_str(), old_string->c_str());
+					}
 				}
 			} else {
-				fwprintf_s(out, L"       + %ws %ws\n", id.c_str(), new_string->c_str());
+				if (is_multiline(*new_string)) {
+					fwprintf_s(out, L"       + %ws\n", id.c_str());
+					for (const auto& line : get_lines(*new_string)) {
+						fwprintf_s(out, L"         + %ws\n", line.c_str());
+					}
+				} else {
+					fwprintf_s(out, L"       + %ws %ws\n", id.c_str(), new_string->c_str());
+				}
 			}
 		} else if (old_string != nullptr) {
-			fwprintf_s(out, L"       - %ws %ws\n", id.c_str(), old_string->c_str());
+			if (is_multiline(*old_string)) {
+				fwprintf_s(out, L"       - %ws\n", id.c_str());
+				for (const auto& line : get_lines(*old_string)) {
+					fwprintf_s(out, L"         - %ws\n", line.c_str());
+				}
+
+			} else {
+				fwprintf_s(out, L"       - %ws %ws\n", id.c_str(), old_string->c_str());
+			}
 		}
 	});
 }
