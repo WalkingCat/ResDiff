@@ -100,7 +100,7 @@ std::map<std::wstring, std::wstring> parse_strings(const std::wstring & name, co
 	return ret;
 }
 
-std::vector<std::wstring> parse_message_table(const std::vector<unsigned char>* data)
+std::map<std::wstring, std::wstring> parse_message_table(const std::vector<unsigned char>* data)
 {
 	map<wstring, wstring> messages;
 	wchar_t buf[16] = L"0x";
@@ -121,12 +121,6 @@ std::vector<std::wstring> parse_message_table(const std::vector<unsigned char>* 
 			}
 		}
 	}
-
-	vector<wstring> ret;
-	for (auto& pair : messages) {
-		ret.push_back(pair.second);
-	}
-	return ret;
-
+	return messages;
 }
 

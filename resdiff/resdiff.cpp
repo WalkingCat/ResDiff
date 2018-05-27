@@ -22,21 +22,21 @@ const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params
 void print_usage(FILE* out) {
 	fwprintf_s(out, L" Usage: resdiff [options]\n\n");
 	for (auto o = begin(cmd_options); o != end(cmd_options); ++o) {
-		if (o->arg != nullptr) fwprintf_s(out, L" -%ws", o->arg); else fwprintf_s(out, L" ");
+		if (o->arg != nullptr) fwprintf_s(out, L" -%ls", o->arg); else fwprintf_s(out, L" ");
 
 		int len = 0;
 		if (o->arg_alt != nullptr) {
 			len = wcslen(o->arg_alt);
-			fwprintf_s(out, L"\t--%ws", o->arg_alt);
+			fwprintf_s(out, L"\t--%ls", o->arg_alt);
 		} else fwprintf_s(out, L"\t");
 
 		if (len < 6) fwprintf_s(out, L"\t");
 
-		if (o->params_desc != nullptr) len += fwprintf_s(out, L" %ws", o->params_desc);
+		if (o->params_desc != nullptr) len += fwprintf_s(out, L" %ls", o->params_desc);
 
 		if (len < 14) fwprintf_s(out, L"\t");
 
-		fwprintf_s(out, L"\t: %ws\n", o->description);
+		fwprintf_s(out, L"\t: %ls\n", o->description);
 	}
 	fwprintf_s(out, L"\n");
 }
@@ -101,21 +101,21 @@ int wmain(int argc, wchar_t* argv[])
 	}
 
 	if (out == nullptr) {
-		wprintf_s(L"can't open %ws for output\n", output_file.c_str());
+		wprintf_s(L"can't open %ls for output\n", output_file.c_str());
 		return 0;
 	}
 
 	auto search_files = [&](bool is_new) -> map<wstring, map<wstring, wstring>> {
 		map<wstring, map<wstring, wstring>> ret;
 		const auto& files_pattern = is_new ? new_files_pattern : old_files_pattern;
-		fwprintf_s(out, L" %ws files: %ws", is_new ? L"new" : L"old", files_pattern.c_str());
+		fwprintf_s(out, L" %ls files: %ls", is_new ? L"new" : L"old", files_pattern.c_str());
 		if (((options & diffWcs) == diffWcs)) {
 			ret = find_files_wcs_ex(files_pattern);
 		} else {
 			auto files = find_files(files_pattern.c_str());
 			if (!files.empty()) ret[wstring()].swap(files);
 		}
-		fwprintf_s(out, L"%ws\n", !ret.empty() ? L"" : L" (EMPTY!)");
+		fwprintf_s(out, L"%ls\n", !ret.empty() ? L"" : L" (EMPTY!)");
 		return ret;
 	};
 
@@ -150,7 +150,7 @@ int wmain(int argc, wchar_t* argv[])
 			wchar_t printed_group_prefix = L' ';
 			auto print_group_name = [&](const wchar_t prefix) {
 				if (!printed_group_name) {
-					fwprintf_s(out, L"\n %wc %ws (\n", prefix, group_name.c_str());
+					fwprintf_s(out, L"\n %lc %ls (\n", prefix, group_name.c_str());
 					printed_group_name = true;
 					printed_group_prefix = prefix;
 				}
@@ -166,7 +166,7 @@ int wmain(int argc, wchar_t* argv[])
 							if (printed_previous_file_name) {
 								fwprintf_s(out, L"\n");
 							}
-							fwprintf_s(out, L"   %wc %ws\n", prefix, file_name.c_str());
+							fwprintf_s(out, L"   %lc %ls\n", prefix, file_name.c_str());
 							printed_previous_file_name = printed_file_name = true;
 						}
 					};
@@ -186,31 +186,47 @@ int wmain(int argc, wchar_t* argv[])
 								[&](const wstring& name, const std::vector<unsigned char> * new_data, const std::vector<unsigned char> * old_data) {
 									//if (new_data == nullptr) {
 									//	print_file_name('*');
-									//	fwprintf_s(out, L"     - %ws # %ws\n", type_name.c_str(), name.c_str());
+									//	fwprintf_s(out, L"     - %ls # %ls\n", type_name.c_str(), name.c_str());
 									//	return;
 									//}
 									const bool diff = (new_data == nullptr) || (old_data == nullptr) ||
 										((new_data->size() != old_data->size()) || (memcmp(new_data->data(), old_data->data(), new_data->size())));
 									if (diff) {
 										print_file_name('*');
-										fwprintf_s(out, L"     %wc %ws # %ws\n", new_data ? old_data ? L'*' : L'+' : L'-', type_name.c_str(), name.c_str());
+										fwprintf_s(out, L"     %lc %ls # %ls\n", new_data ? old_data ? L'*' : L'+' : L'-', type_name.c_str(), name.c_str());
 
 										if (type_name == L"STRING") {
 											diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
 										} else if (type_name == L"MESSAGETABLE") {
-											diff_sequences(parse_message_table(new_data), parse_message_table(old_data),
-												[&](const wstring* new_message, const wstring* old_message) {
-													if (old_message == nullptr) {
-														if (new_message != nullptr) {
-															fwprintf_s(out, L"       + %ws", new_message->c_str());
-														}
-													} else {
-														if (new_message == nullptr) {
-															fwprintf_s(out, L"       - %ws", old_message->c_str());
+											const auto& new_messages = parse_message_table(new_data);
+											const auto& old_messages = parse_message_table(old_data);
+											auto get_keys = [](const map<wstring, wstring>& m) {
+												set<wstring> ret;
+												for (auto& pair : m) { ret.insert(pair.first); }
+												return ret;
+											};
+											auto get_values = [](const map<wstring, wstring>& m) {
+												vector<wstring> ret;
+												for (auto& pair : m) { ret.push_back(pair.second); }
+												return ret;
+											};
+											if (get_keys(new_messages) == get_keys(old_messages)) {
+												diff_string_maps(out, new_messages, old_messages);
+											} else {
+												diff_sequences(get_values(new_messages), get_values(old_messages),
+													[&](const wstring* new_message, const wstring* old_message) {
+														if (old_message == nullptr) {
+															if (new_message != nullptr) {
+																fwprintf_s(out, L"       + %ls", new_message->c_str());
+															}
+														} else {
+															if (new_message == nullptr) {
+																fwprintf_s(out, L"       - %ls", old_message->c_str());
+															}
 														}
 													}
-												}
-											);
+												);
+											}
 										}
 									}
 								}
@@ -221,7 +237,7 @@ int wmain(int argc, wchar_t* argv[])
 			);
 
 			if (printed_group_name)
-				fwprintf_s(out, L" %wc )\n", printed_group_prefix);
+				fwprintf_s(out, L" %lc )\n", printed_group_prefix);
 		}
 	);
 
@@ -260,37 +276,37 @@ void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const ma
 			if (old_string != nullptr) {
 				if ((*new_string) != (*old_string)) {
 					if (is_multiline(*new_string) || (is_multiline(*old_string))) {
-						fwprintf_s(out, L"       * %ws\n", id.c_str());
+						fwprintf_s(out, L"       * %ls\n", id.c_str());
 						diff_sequences(get_lines(*new_string), get_lines(*old_string),
 							[&](const wstring* new_line, const wstring* old_line) {
-								fwprintf_s(out, L"         %lc %ws\n", new_line ? old_line ? L' ' : L'+' : L'-',
+								fwprintf_s(out, L"         %lc %ls\n", new_line ? old_line ? L' ' : L'+' : L'-',
 									new_line ? new_line->c_str() : old_line->c_str());
 							}
 						);
 					} else {
-						fwprintf_s(out, L"       * %ws %ws\n", id.c_str(), new_string->c_str());
-						fwprintf_s(out, L"       $ %ws %ws\n", id.c_str(), old_string->c_str());
+						fwprintf_s(out, L"       * %ls %ls\n", id.c_str(), new_string->c_str());
+						fwprintf_s(out, L"       $ %ls %ls\n", id.c_str(), old_string->c_str());
 					}
 				}
 			} else {
 				if (is_multiline(*new_string)) {
-					fwprintf_s(out, L"       + %ws\n", id.c_str());
+					fwprintf_s(out, L"       + %ls\n", id.c_str());
 					for (const auto& line : get_lines(*new_string)) {
-						fwprintf_s(out, L"         + %ws\n", line.c_str());
+						fwprintf_s(out, L"         + %ls\n", line.c_str());
 					}
 				} else {
-					fwprintf_s(out, L"       + %ws %ws\n", id.c_str(), new_string->c_str());
+					fwprintf_s(out, L"       + %ls %ls\n", id.c_str(), new_string->c_str());
 				}
 			}
 		} else if (old_string != nullptr) {
 			if (is_multiline(*old_string)) {
-				fwprintf_s(out, L"       - %ws\n", id.c_str());
+				fwprintf_s(out, L"       - %ls\n", id.c_str());
 				for (const auto& line : get_lines(*old_string)) {
-					fwprintf_s(out, L"         - %ws\n", line.c_str());
+					fwprintf_s(out, L"         - %ls\n", line.c_str());
 				}
 
 			} else {
-				fwprintf_s(out, L"       - %ws %ws\n", id.c_str(), old_string->c_str());
+				fwprintf_s(out, L"       - %ls %ls\n", id.c_str(), old_string->c_str());
 			}
 		}
 	});
