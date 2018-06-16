@@ -199,8 +199,19 @@ int wmain(int argc, wchar_t* argv[])
 										if (type_name == L"STRING") {
 											diff_string_maps(out, parse_strings(name, new_data), parse_strings(name, old_data));
 										} else if (type_name == L"MESSAGETABLE") {
-											const auto& new_messages = parse_message_table(new_data);
-											const auto& old_messages = parse_message_table(old_data);
+											auto cleanup = [](map<wstring, wstring>&& messages) {
+												for (auto& pair : messages) {
+													auto& message = pair.second;
+													auto pos = message.find(L"\r\n", 0);
+													if ((pos != wstring::npos) && (pos == message.size() - 2)) {
+														// remove trailing line-ending if its the only one
+														message.erase(pos, 2);
+													}
+												}
+												return move(messages);
+											};
+											const auto& new_messages = cleanup(parse_message_table(new_data));
+											const auto& old_messages = cleanup(parse_message_table(old_data));
 											auto get_keys = [](const map<wstring, wstring>& m) {
 												set<wstring> ret;
 												for (auto& pair : m) { ret.insert(pair.first); }

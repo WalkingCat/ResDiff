@@ -112,7 +112,9 @@ std::map<std::wstring, std::wstring> parse_message_table(const std::vector<unsig
 			for (auto id = msg_block->LowId; id <= msg_block->HighId; ++id) {
 				_ultow_s(id, buf + 2, _countof(buf) - 2, 16);
 				if (msg_entry->Flags == 1) {
-					messages[buf] = wstring((wchar_t*)msg_entry->Text, (msg_entry->Length - (msg_entry->Text - (PBYTE)msg_entry)) / sizeof(wchar_t));
+					auto len = (msg_entry->Length - (msg_entry->Text - (PBYTE)msg_entry)) / sizeof(wchar_t);
+					while ((len > 0) && (*((wchar_t*)msg_entry->Text + len - 1) == L'\0')) --len; // ignore trailing zeros
+					messages[buf] = wstring((wchar_t*)msg_entry->Text, len);
 				} else {
 					static std::wstring_convert<std::codecvt<wchar_t, char, std::mbstate_t>> conv;
 					messages[buf] = conv.from_bytes((const char*)&msg_entry->Text[0], (const char*)&msg_entry->Text[msg_entry->Length - (msg_entry->Text - (PBYTE)msg_entry) - 1]);
