@@ -6,6 +6,7 @@ enum diff_options {
 	diffNone = 0x0,
 	diffOld = 0x1,
 	diffNew = 0x2,
+	diffRec = 0x4,
 	diffWcs = 0x8,
 	diffOutput = 0x40000000,
 	diffHelp = 0x80000000,
@@ -15,6 +16,7 @@ const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params
 	{ L"?",		L"help",			nullptr,		L"show this help",						diffHelp },
 	{ L"n",		L"new",				L"<filename>",	L"specify new file(s)",					diffNew },
 	{ L"o",		L"old",				L"<filename>",	L"specify old file(s)",					diffOld },
+	{ L"r",		L"recursive",		nullptr,		L"search folder recursively",			diffRec },
 	{ nullptr,	L"wcs",				nullptr,		L"folder is Windows Component Store",	diffWcs },
 	{ L"O",		L"out",				L"<filename>",	L"output to file",						diffOutput },
 };
@@ -113,8 +115,7 @@ int wmain(int argc, wchar_t* argv[])
 		if (((options & diffWcs) == diffWcs)) {
 			ret = find_files_wcs_ex(files_pattern);
 		} else {
-			auto files = find_files(files_pattern.c_str());
-			if (!files.empty()) ret[wstring()].swap(files);
+			ret = find_files_ex(files_pattern, ((options & diffRec) == diffRec));
 		}
 		fwprintf_s(out, L"%ls\n", !ret.empty() ? L"" : L" (EMPTY!)");
 		return ret;
@@ -124,7 +125,7 @@ int wmain(int argc, wchar_t* argv[])
 	fwprintf_s(out, L"\n");
 	if (new_file_groups.empty() && old_file_groups.empty()) return 0;
 
-	if (((options & diffWcs) == 0)) {
+	if (((options & (diffWcs | diffRec)) == 0)) {
 		auto& new_files = new_file_groups[wstring()], &old_files = old_file_groups[wstring()];
 		if ((new_files.size() == 1) && (old_files.size() == 1)) {
 			// allows diff single files with different names
