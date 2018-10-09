@@ -2,45 +2,14 @@
 #include "resutils.h"
 using namespace std;
 
-enum diff_options {
-	diffNone = 0x0,
-	diffOld = 0x1,
-	diffNew = 0x2,
-	diffRec = 0x4,
-	diffWcs = 0x8,
-	diffOutput = 0x40000000,
-	diffHelp = 0x80000000,
-};
-
-const struct { const wchar_t* arg; const wchar_t* arg_alt; const wchar_t* params_desc; const wchar_t* description; const diff_options options; } cmd_options[] = {
-	{ L"?",		L"help",			nullptr,		L"show this help",						diffHelp },
-	{ L"n",		L"new",				L"<filename>",	L"specify new file(s)",					diffNew },
-	{ L"o",		L"old",				L"<filename>",	L"specify old file(s)",					diffOld },
-	{ L"r",		L"recursive",		nullptr,		L"search folder recursively",			diffRec },
-	{ nullptr,	L"wcs",				nullptr,		L"folder is Windows Component Store",	diffWcs },
-	{ L"O",		L"out",				L"<filename>",	L"output to file",						diffOutput },
-};
-
-void print_usage(FILE* out) {
-	fwprintf_s(out, L" Usage: resdiff [options]\n\n");
-	for (auto o = begin(cmd_options); o != end(cmd_options); ++o) {
-		if (o->arg != nullptr) fwprintf_s(out, L" -%ls", o->arg); else fwprintf_s(out, L" ");
-
-		int len = 0;
-		if (o->arg_alt != nullptr) {
-			len = wcslen(o->arg_alt);
-			fwprintf_s(out, L"\t--%ls", o->arg_alt);
-		} else fwprintf_s(out, L"\t");
-
-		if (len < 6) fwprintf_s(out, L"\t");
-
-		if (o->params_desc != nullptr) len += fwprintf_s(out, L" %ls", o->params_desc);
-
-		if (len < 14) fwprintf_s(out, L"\t");
-
-		fwprintf_s(out, L"\t: %ls\n", o->description);
-	}
-	fwprintf_s(out, L"\n");
+namespace cmdl {
+	const cmdl_option show_help { L"?",		L"help",		nullptr,		L"show this help" };
+	const cmdl_option new_files { L"n",		L"new",			L"<filename>",	L"specify new file(s)" };
+	const cmdl_option old_files { L"o",		L"old",			L"<filename>",	L"specify old file(s)" };
+	const cmdl_option recursive { L"r",		L"recursive",	nullptr,		L"search folder recursively" };
+	const cmdl_option wcs_folder { nullptr,	L"wcs",			nullptr,		L"folder is Windows Component Store" };
+	const cmdl_option out_file { L"O",		L"out",			L"<filename>",	L"output to file" };
+	const cmdl_option * options[] = { &show_help, &new_files, &old_files, &recursive, &wcs_folder, &out_file };
 }
 
 void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string);
@@ -50,51 +19,21 @@ int wmain(int argc, wchar_t* argv[])
 {
 	auto out = stdout;
 
-	int options = diffNone;
-	const wchar_t* err_arg = nullptr;
-	wstring new_files_pattern, old_files_pattern, output_file;
+	wprintf_s(L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
 
-	fwprintf_s(out, L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
+	auto c_options = parse_cmdl(argc, argv, cmdl::options);
 
-	for (int i = 1; i < argc; ++i) {
-		const wchar_t* arg = argv[i];
-		if ((arg[0] == '-') || ((arg[0] == '/'))) {
-			diff_options curent_option = diffNone;
-			if ((arg[0] == '-') && (arg[1] == '-')) {
-				for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
-					if ((o->arg_alt != nullptr) && (wcscmp(arg + 2, o->arg_alt) == 0)) { curent_option = o->options; }
-				}
-			}
-			else {
-				for (auto o = std::begin(cmd_options); o != std::end(cmd_options); ++o) {
-					if ((o->arg != nullptr) && (wcscmp(arg + 1, o->arg) == 0)) { curent_option = o->options; }
-				}
-			}
+	auto err_info = c_options[nullptr];
+	auto new_files_pattern = c_options[&cmdl::new_files];
+	auto old_files_pattern = c_options[&cmdl::old_files];
+	auto output_file = c_options[&cmdl::out_file];
+	const bool is_wcs = c_options.find(&cmdl::wcs_folder) != c_options.end();
+	const bool is_rec = c_options.find(&cmdl::recursive) != c_options.end();
+	const bool show_help = c_options.find(&cmdl::show_help) != c_options.end();
 
-			bool valid = false;
-			if (curent_option != diffNone) {
-				valid = true;
-				if (curent_option == diffNew) {
-					if ((i + 1) < argc) new_files_pattern = argv[++i];
-					else valid = false;
-				}
-				else if (curent_option == diffOld) {
-					if ((i + 1) < argc) old_files_pattern = argv[++i];
-					else valid = false;
-				}
-				else if (curent_option == diffOutput) {
-					if ((i + 1) < argc) output_file = argv[++i];
-					else valid = false;
-				} else options = (options | curent_option);
-			}
-			if (!valid && (err_arg == nullptr)) err_arg = arg;
-		}
-		else { if (new_files_pattern.empty()) new_files_pattern = arg; else err_arg = arg; }
-	}
-
-	if ((new_files_pattern.empty() && old_files_pattern.empty()) || (err_arg != nullptr) || (options & diffHelp)) {
-		if (err_arg != nullptr) printf_s("\tError in option: %S\n\n", err_arg);
-		print_usage(out);
+	if (show_help || (!err_info.empty()) || (new_files_pattern.empty() && old_files_pattern.empty())) {
+		if (!err_info.empty()) printf_s("\tError in option: %ls\n\n", err_info.c_str());
+		print_cmdl_usage(L"resdiff", cmdl::options);
 		return 0;
 	}
 
@@ -112,10 +51,10 @@ int wmain(int argc, wchar_t* argv[])
 		map<wstring, map<wstring, wstring>> ret;
 		const auto& files_pattern = is_new ? new_files_pattern : old_files_pattern;
 		fwprintf_s(out, L" %ls files: %ls", is_new ? L"new" : L"old", files_pattern.c_str());
-		if (((options & diffWcs) == diffWcs)) {
+		if (is_wcs) {
 			ret = find_files_wcs_ex(files_pattern);
 		} else {
-			ret = find_files_ex(files_pattern, ((options & diffRec) == diffRec));
+			ret = find_files_ex(files_pattern, is_rec);
 		}
 		fwprintf_s(out, L"%ls\n", !ret.empty() ? L"" : L" (EMPTY!)");
 		return ret;
@@ -125,7 +64,7 @@ int wmain(int argc, wchar_t* argv[])
 	fwprintf_s(out, L"\n");
 	if (new_file_groups.empty() && old_file_groups.empty()) return 0;
 
-	if (((options & (diffWcs | diffRec)) == 0)) {
+	if (!(is_wcs || is_rec)) {
 		auto& new_files = new_file_groups[wstring()], &old_files = old_file_groups[wstring()];
 		if ((new_files.size() == 1) && (old_files.size() == 1)) {
 			// allows diff single files with different names
@@ -142,7 +81,7 @@ int wmain(int argc, wchar_t* argv[])
 			}
 		}
 	}
-	
+
 	fwprintf_s(out, L" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
 
 	const map<wstring, wstring> empty_files;
@@ -157,7 +96,7 @@ int wmain(int argc, wchar_t* argv[])
 					printed_group_prefix = prefix;
 				}
 			};
-			
+
 			bool printed_previous_file_name = false;
 			diff_maps(new_files ? *new_files : empty_files, old_files ? *old_files : empty_files,
 				[&](const wstring& file_name, const wstring * new_file, const wstring * old_file) {
@@ -248,7 +187,7 @@ int wmain(int argc, wchar_t* argv[])
 
 	fwprintf_s(out, L"\n");
 
-    return 0;
+	return 0;
 }
 
 const size_t find_linebreak(const wstring& str, size_t* pos = nullptr) {
@@ -271,7 +210,7 @@ vector<wstring> get_lines(const wstring& str) {
 		ret.emplace_back(str.cbegin() + start_pos, str.cbegin() + pos);
 		start_pos = next_start_pos;
 	}
-	if(start_pos < str.size()) ret.emplace_back(str.cbegin() + start_pos, str.cend());
+	if (start_pos < str.size()) ret.emplace_back(str.cbegin() + start_pos, str.cend());
 	return ret;
 }
 
@@ -283,51 +222,43 @@ void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const
 					fwprintf_s(out, L"       * %ls\n", id.c_str());
 					diff_sequences(get_lines(*new_string), get_lines(*old_string),
 						[&](const wstring* new_line, const wstring* old_line) {
-						if (new_line && old_line) {
-							if (wcscmp(new_line->c_str(), old_line->c_str()) == 0) {
-								fwprintf_s(out, L"           %ls\n", new_line->c_str());
+							if (new_line && old_line) {
+								if (wcscmp(new_line->c_str(), old_line->c_str()) == 0) {
+									fwprintf_s(out, L"           %ls\n", new_line->c_str());
+								} else {
+									fwprintf_s(out, L"         * %ls\n", new_line->c_str());
+									fwprintf_s(out, L"         $ %ls\n", old_line->c_str());
+								}
+							} else if (new_line) {
+								fwprintf_s(out, L"         + %ls\n", new_line->c_str());
+							} else if (old_line) {
+								fwprintf_s(out, L"         - %ls\n", old_line->c_str());
 							}
-							else {
-								fwprintf_s(out, L"         * %ls\n", new_line->c_str());
-								fwprintf_s(out, L"         $ %ls\n", old_line->c_str());
-							}
 						}
-						else if (new_line) {
-							fwprintf_s(out, L"         + %ls\n", new_line->c_str());
-						}
-						else if (old_line) {
-							fwprintf_s(out, L"         - %ls\n", old_line->c_str());
-						}
-					}
 					);
-				}
-				else {
+				} else {
 					fwprintf_s(out, L"       * %ls %ls\n", id.c_str(), new_string->c_str());
 					fwprintf_s(out, L"       $ %ls %ls\n", id.c_str(), old_string->c_str());
 				}
 			}
-		}
-		else {
+		} else {
 			if (is_multiline(*new_string)) {
 				fwprintf_s(out, L"       + %ls\n", id.c_str());
 				for (const auto& line : get_lines(*new_string)) {
 					fwprintf_s(out, L"         + %ls\n", line.c_str());
 				}
-			}
-			else {
+			} else {
 				fwprintf_s(out, L"       + %ls %ls\n", id.c_str(), new_string->c_str());
 			}
 		}
-	}
-	else if (old_string != nullptr) {
+	} else if (old_string != nullptr) {
 		if (is_multiline(*old_string)) {
 			fwprintf_s(out, L"       - %ls\n", id.c_str());
 			for (const auto& line : get_lines(*old_string)) {
 				fwprintf_s(out, L"         - %ls\n", line.c_str());
 			}
 
-		}
-		else {
+		} else {
 			fwprintf_s(out, L"       - %ls %ls\n", id.c_str(), old_string->c_str());
 		}
 	}
@@ -336,5 +267,5 @@ void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map) {
 	diff_maps(new_map, old_map, [&](const wstring& id, const wstring* new_string, const wstring* old_string) {
 		diff_strings(out, id, new_string, old_string);
-	});
+		});
 }

@@ -6,9 +6,11 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <memory>
 #include <map>
 
+#include "../witutils/cmdl_utils.h"
 #include "../witutils/diff_utils.h"
 #include "../witutils/find_files.h"
 #include "../witutils/find_files_wcs.h"

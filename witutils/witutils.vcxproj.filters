@@ -6,10 +6,12 @@
     <ClInclude Include="find_files.h" />
     <ClInclude Include="find_files_wcs.h" />
     <ClInclude Include="diff_utils.h" />
+    <ClInclude Include="cmdl_utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="find_files.cpp" />
     <ClCompile Include="find_files_wcs.cpp" />
+    <ClCompile Include="cmdl_utils.cpp" />
   </ItemGroup>
 </Project>
