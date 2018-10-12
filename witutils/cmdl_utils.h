@@ -11,8 +11,10 @@ struct cmdl_option {
 
 std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_t* argv[], const cmdl_option* options[], size_t count);
 
+using options_data_t = std::unordered_map<const cmdl_option*, std::wstring>;
+
 template<size_t count>
-std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_t* argv[], const cmdl_option* (&options)[count])
+options_data_t parse_cmdl(int argc, wchar_t* argv[], const cmdl_option* (&options)[count])
 {
 	return parse_cmdl(argc, argv, options, count);
 }

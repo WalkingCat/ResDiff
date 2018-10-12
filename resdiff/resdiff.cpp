@@ -1,16 +1,7 @@
 #include "stdafx.h"
 #include "resutils.h"
-using namespace std;
 
-namespace cmdl {
-	const cmdl_option show_help { L"?",		L"help",		nullptr,		L"show this help" };
-	const cmdl_option new_files { L"n",		L"new",			L"<filename>",	L"specify new file(s)" };
-	const cmdl_option old_files { L"o",		L"old",			L"<filename>",	L"specify old file(s)" };
-	const cmdl_option recursive { L"r",		L"recursive",	nullptr,		L"search folder recursively" };
-	const cmdl_option wcs_folder { nullptr,	L"wcs",			nullptr,		L"folder is Windows Component Store" };
-	const cmdl_option out_file { L"O",		L"out",			L"<filename>",	L"output to file" };
-	const cmdl_option * options[] = { &show_help, &new_files, &old_files, &recursive, &wcs_folder, &out_file };
-}
+using namespace std;
 
 void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string);
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
@@ -21,40 +12,34 @@ int wmain(int argc, wchar_t* argv[])
 
 	wprintf_s(L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
 
-	auto c_options = parse_cmdl(argc, argv, cmdl::options);
+	const auto& params = init_diff_params(parse_cmdl(argc, argv, diff_cmdl::options));
 
-	auto err_info = c_options[nullptr];
-	auto new_files_pattern = c_options[&cmdl::new_files];
-	auto old_files_pattern = c_options[&cmdl::old_files];
-	auto output_file = c_options[&cmdl::out_file];
-	const bool is_wcs = c_options.find(&cmdl::wcs_folder) != c_options.end();
-	const bool is_rec = c_options.find(&cmdl::recursive) != c_options.end();
-	const bool show_help = c_options.find(&cmdl::show_help) != c_options.end();
-
-	if (show_help || (!err_info.empty()) || (new_files_pattern.empty() && old_files_pattern.empty())) {
-		if (!err_info.empty()) printf_s("\tError in option: %ls\n\n", err_info.c_str());
-		print_cmdl_usage(L"resdiff", cmdl::options);
+	if (params.show_help || (!params.error.empty()) || (params.new_files_pattern.empty() && params.old_files_pattern.empty())) {
+		if (!params.error.empty()) {
+			printf_s("\tError in option: %ls\n\n", params.error.c_str());
+		}
+		print_cmdl_usage(L"resdiff", diff_cmdl::options);
 		return 0;
 	}
 
-	if (!output_file.empty()) {
+	if (!params.output_file_name.empty()) {
 		out = nullptr;
-		_wfopen_s(&out, output_file.c_str(), L"w, ccs=UTF-8");
+		_wfopen_s(&out, params.output_file_name.c_str(), L"w, ccs=UTF-8");
 	}
 
 	if (out == nullptr) {
-		wprintf_s(L"can't open %ls for output\n", output_file.c_str());
+		wprintf_s(L"can't open %ls for output\n", params.output_file_name.c_str());
 		return 0;
 	}
 
 	auto search_files = [&](bool is_new) -> map<wstring, map<wstring, wstring>> {
 		map<wstring, map<wstring, wstring>> ret;
-		const auto& files_pattern = is_new ? new_files_pattern : old_files_pattern;
+		const auto& files_pattern = is_new ? params.new_files_pattern : params.old_files_pattern;
 		fwprintf_s(out, L" %ls files: %ls", is_new ? L"new" : L"old", files_pattern.c_str());
-		if (is_wcs) {
+		if (params.is_wcs) {
 			ret = find_files_wcs_ex(files_pattern);
 		} else {
-			ret = find_files_ex(files_pattern, is_rec);
+			ret = find_files_ex(files_pattern, params.is_rec);
 		}
 		fwprintf_s(out, L"%ls\n", !ret.empty() ? L"" : L" (EMPTY!)");
 		return ret;
@@ -64,7 +49,7 @@ int wmain(int argc, wchar_t* argv[])
 	fwprintf_s(out, L"\n");
 	if (new_file_groups.empty() && old_file_groups.empty()) return 0;
 
-	if (!(is_wcs || is_rec)) {
+	if (!(params.is_wcs || params.is_rec)) {
 		auto& new_files = new_file_groups[wstring()], &old_files = old_file_groups[wstring()];
 		if ((new_files.size() == 1) && (old_files.size() == 1)) {
 			// allows diff single files with different names

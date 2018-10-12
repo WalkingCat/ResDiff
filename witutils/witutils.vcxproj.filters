@@ -7,11 +7,13 @@
     <ClInclude Include="find_files_wcs.h" />
     <ClInclude Include="diff_utils.h" />
     <ClInclude Include="cmdl_utils.h" />
+    <ClInclude Include="diff_commons.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="find_files.cpp" />
     <ClCompile Include="find_files_wcs.cpp" />
     <ClCompile Include="cmdl_utils.cpp" />
+    <ClCompile Include="diff_commons.cpp" />
   </ItemGroup>
 </Project>
