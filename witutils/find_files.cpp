@@ -45,14 +45,22 @@ namespace {
 std::map<std::wstring, std::map<std::wstring, std::wstring>> find_files_ex(const wstring& pattern, bool recursive, const std::wstring& default_file_pattern)
 {
 	std::map<std::wstring, std::map<std::wstring, std::wstring>> ret;
+	
+	if (pattern.empty())
+		return ret;
 
 	wstring dir = pattern;
 	wstring file_pat = default_file_pattern;
-	if (PathIsDirectory(dir.c_str()) == FALSE) {
-		const auto file_spec = PathFindFileName(pattern.c_str());
-		if (file_spec != pattern.c_str()) {
-			dir = wstring(pattern.c_str(), file_spec - pattern.c_str());
-			file_pat = file_spec;
+	if (PathIsDirectory(pattern.c_str()) == FALSE) {
+		if (PathIsFileSpec(pattern.c_str()) != FALSE) {
+			dir.clear();
+			file_pat = pattern;
+		} else {
+			const auto file_spec = PathFindFileName(pattern.c_str());
+			if (file_spec != pattern.c_str()) {
+				dir = wstring(pattern.c_str(), file_spec - pattern.c_str());
+				file_pat = file_spec;
+			}
 		}
 	}
 
