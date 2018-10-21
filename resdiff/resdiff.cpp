@@ -8,69 +8,24 @@ void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const ma
 
 int wmain(int argc, wchar_t* argv[])
 {
-	auto out = stdout;
-
 	wprintf_s(L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
 
-	const auto& params = init_diff_params(parse_cmdl(argc, argv, diff_cmdl::options));
+	const auto& options_data = parse_cmdl(argc, argv, diff_cmdl::options);
+	const auto& params = init_diff_params(options_data);
 
 	if (params.show_help || (!params.error.empty()) || (params.new_files_pattern.empty() && params.old_files_pattern.empty())) {
 		if (!params.error.empty()) {
-			printf_s("\tError in option: %ls\n\n", params.error.c_str());
+			printf_s("\t%ls\n\n", params.error.c_str());
 		}
-		print_cmdl_usage(L"resdiff", diff_cmdl::options);
+		if (params.show_help) print_cmdl_usage(L"resdiff", diff_cmdl::options);
 		return 0;
 	}
 
-	if (!params.output_file_name.empty()) {
-		out = nullptr;
-		_wfopen_s(&out, params.output_file_name.c_str(), L"w, ccs=UTF-8");
-	}
-
-	if (out == nullptr) {
-		wprintf_s(L"can't open %ls for output\n", params.output_file_name.c_str());
-		return 0;
-	}
-
-	auto search_files = [&](bool is_new) -> map<wstring, map<wstring, wstring>> {
-		map<wstring, map<wstring, wstring>> ret;
-		const auto& files_pattern = is_new ? params.new_files_pattern : params.old_files_pattern;
-		fwprintf_s(out, L" %ls files: %ls", is_new ? L"new" : L"old", files_pattern.c_str());
-		if (params.is_wcs) {
-			ret = find_files_wcs_ex(files_pattern);
-		} else {
-			ret = find_files_ex(files_pattern, params.is_rec);
-		}
-		fwprintf_s(out, L"%ls\n", !ret.empty() ? L"" : L" (EMPTY!)");
-		return ret;
-	};
-
-	map<wstring, map<wstring, wstring>> new_file_groups = search_files(true), old_file_groups = search_files(false);
-	fwprintf_s(out, L"\n");
-	if (new_file_groups.empty() && old_file_groups.empty()) return 0;
-
-	if (!(params.is_wcs || params.is_rec)) {
-		auto& new_files = new_file_groups[wstring()], &old_files = old_file_groups[wstring()];
-		if ((new_files.size() == 1) && (old_files.size() == 1)) {
-			// allows diff single files with different names
-			auto& new_file_name = new_files.begin()->first;
-			auto& old_file_name = old_files.begin()->first;
-			if (new_file_name != old_file_name) {
-				auto diff_file_names = new_file_name + L" <=> " + old_file_name;
-				auto new_file = new_files.begin()->second;
-				new_files.clear();
-				new_files[diff_file_names] = new_file;
-				auto old_file = old_files.begin()->second;
-				old_files.clear();
-				old_files[diff_file_names] = old_file;
-			}
-		}
-	}
-
-	fwprintf_s(out, L" diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
+	auto out = params.output_file;
+	fwprintf_s(out, L"\n diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
 
 	const map<wstring, wstring> empty_files;
-	diff_maps(new_file_groups, old_file_groups,
+	diff_maps(params.new_file_groups, params.old_file_groups,
 		[&](const wstring& group_name, const map<wstring, wstring>* new_files, const map<wstring, wstring>* old_files) {
 			bool printed_group_name = false;
 			wchar_t printed_group_prefix = L' ';

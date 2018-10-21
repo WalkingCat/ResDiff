@@ -17,8 +17,11 @@ struct diff_params {
 	std::wstring new_files_pattern;
 	std::wstring old_files_pattern;
 	std::wstring output_file_name;
+	FILE* output_file;
 	bool is_wcs;
 	bool is_rec;
+	std::map<std::wstring, std::map<std::wstring, std::wstring>> new_file_groups;
+	std::map<std::wstring, std::map<std::wstring, std::wstring>> old_file_groups;
 };
 
 diff_params init_diff_params(const options_data_t& options_data);
