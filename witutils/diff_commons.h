@@ -9,6 +9,7 @@ struct diff_cmdl {
 	const static cmdl_option wcs_folder;
 	const static cmdl_option out_file;
 	const static cmdl_option * options[6];
+	const static cmdl_option * default_option;
 };
 
 struct diff_params {
@@ -24,4 +25,5 @@ struct diff_params {
 	std::map<std::wstring, std::map<std::wstring, std::wstring>> old_file_groups;
 };
 
+diff_params init_diff_params(int argc, wchar_t* argv[]);
 diff_params init_diff_params(const options_data_t& options_data);

@@ -3,17 +3,8 @@
 
 using namespace std;
 
-std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * options[], size_t count) {
+options_data_t parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * options[], size_t count, const cmdl_option* default_option) {
 	unordered_map<const cmdl_option*, wstring> ret;
-
-	const cmdl_option* default_opt = nullptr;
-	for (size_t i = 0; i < count; ++i) {
-		auto opt = options[i];
-		if (opt->is_default) {
-			default_opt = opt;
-			break;
-		}
-	}
 
 	for (int i = 1; i < argc; ++i) {
 		const wchar_t* arg = argv[i];
@@ -47,8 +38,8 @@ std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_
 				break;
 			}
 
-		} else if ((default_opt != nullptr) && (default_opt->data_desc != nullptr) && (ret.find(default_opt) == ret.end())) {
-			ret[default_opt] = arg;
+		} else if ((default_option != nullptr) && (default_option->data_desc != nullptr) && (ret.find(default_option) == ret.end())) {
+			ret[default_option] = arg;
 		}
 
 	}
@@ -56,12 +47,12 @@ std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_
 	return ret;
 }
 
-void print_cmdl_usage(const wchar_t * app, const cmdl_option * options[], size_t count) {
+void print_cmdl_usage(const wchar_t * app, const cmdl_option * options[], size_t count, const cmdl_option* default_option) {
 	wprintf_s(L" Usage: %ls [options]\n\n", app);
 	for (size_t i = 0; i < count; ++i) {
 		auto o = options[i];
 		if (o->arg != nullptr) {
-			wprintf_s(o->is_default ? L" [-%ls]" : L" -%ls", o->arg);
+			wprintf_s((o == default_option) ? L" [-%ls]" : L" -%ls", o->arg);
 		} else {
 			wprintf_s(L" ");
 		}

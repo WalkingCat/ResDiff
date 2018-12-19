@@ -49,18 +49,16 @@ std::map<std::wstring, std::map<std::wstring, std::wstring>> find_files_ex(const
 	if (pattern.empty())
 		return ret;
 	
-	wstring dir = pattern;
-	wstring file_pat = default_file_pattern;
-	if (PathIsDirectory(pattern.c_str()) == FALSE) {
-		if (PathIsFileSpec(pattern.c_str()) != FALSE) {
-			dir.clear();
-			file_pat = pattern;
-		} else { 
-			const auto file_spec = PathFindFileName(pattern.c_str());
-			if (file_spec != pattern.c_str()) {
-				dir = wstring(pattern.c_str(), file_spec - pattern.c_str());
-				file_pat = file_spec;
-			}
+	wstring dir;
+	wstring file_pat = pattern;
+	if (PathIsDirectory(pattern.c_str()) != FALSE) {
+		dir = pattern;
+		file_pat = default_file_pattern;
+	} else if (PathIsFileSpec(pattern.c_str()) == FALSE) {
+		const auto file_spec = PathFindFileName(pattern.c_str());
+		if (file_spec != pattern.c_str()) {
+			dir = wstring(pattern.c_str(), file_spec - pattern.c_str());
+			file_pat = file_spec;
 		}
 	}
 

@@ -10,14 +10,13 @@ int wmain(int argc, wchar_t* argv[])
 {
 	wprintf_s(L"\n ResDiff v0.2 https://github.com/WalkingCat/ResDiff\n\n");
 
-	const auto& options_data = parse_cmdl(argc, argv, diff_cmdl::options);
-	const auto& params = init_diff_params(options_data);
+	const auto& params = init_diff_params(argc, argv);
 
 	if (params.show_help || (!params.error.empty()) || (params.new_files_pattern.empty() && params.old_files_pattern.empty())) {
 		if (!params.error.empty()) {
 			printf_s("\t%ls\n\n", params.error.c_str());
 		}
-		if (params.show_help) print_cmdl_usage(L"resdiff", diff_cmdl::options);
+		if (params.show_help) print_cmdl_usage(L"resdiff", diff_cmdl::options, diff_cmdl::default_option);
 		return 0;
 	}
 
