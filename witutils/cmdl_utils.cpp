@@ -6,26 +6,31 @@ using namespace std;
 std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * options[], size_t count) {
 	unordered_map<const cmdl_option*, wstring> ret;
 
+	const cmdl_option* default_opt = nullptr;
+	for (size_t i = 0; i < count; ++i) {
+		auto opt = options[i];
+		if (opt->is_default) {
+			default_opt = opt;
+			break;
+		}
+	}
+
 	for (int i = 1; i < argc; ++i) {
 		const wchar_t* arg = argv[i];
+		const cmdl_option* option = nullptr;
 		if ((arg[0] == '-') || ((arg[0] == '/'))) {
-			const cmdl_option* option = nullptr;
-			if ((arg[0] == '-') && (arg[1] == '-')) {
-				for (size_t i = 0; i < count; ++i) {
-					auto o = options[i];
-					if ((o->arg_alt != nullptr) && (wcscmp(arg + 2, o->arg_alt) == 0)) {
-						option = o;
-					}
-				}
-			} else {
-				for (size_t i = 0; i < count; ++i) {
-					auto o = options[i];
-					if ((o->arg != nullptr) && (wcscmp(arg + 1, o->arg) == 0)) {
-						option = o;
-					}
+			const bool is_alt = ((arg[0] == '-') && (arg[1] == '-'));
+
+			for (size_t i = 0; i < count; ++i) {
+				auto o = options[i];
+				const bool match = is_alt ?
+					((o->arg_alt != nullptr) && (wcscmp(arg + 2, o->arg_alt) == 0)) :
+					((o->arg != nullptr) && (wcscmp(arg + 1, o->arg) == 0));
+				if (match) {
+					option = o;
 				}
 			}
-
+			
 			bool err = false;
 			if (option != nullptr) {
 				if (option->data_desc != nullptr) {
@@ -41,7 +46,11 @@ std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_
 				ret[nullptr] = arg;
 				break;
 			}
+
+		} else if ((default_opt != nullptr) && (default_opt->data_desc != nullptr) && (ret.find(default_opt) == ret.end())) {
+			ret[default_opt] = arg;
 		}
+
 	}
 
 	return ret;
@@ -52,7 +61,7 @@ void print_cmdl_usage(const wchar_t * app, const cmdl_option * options[], size_t
 	for (size_t i = 0; i < count; ++i) {
 		auto o = options[i];
 		if (o->arg != nullptr) {
-			wprintf_s(L" -%ls", o->arg);
+			wprintf_s(o->is_default ? L" [-%ls]" : L" -%ls", o->arg);
 		} else {
 			wprintf_s(L" ");
 		}

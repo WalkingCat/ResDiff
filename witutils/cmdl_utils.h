@@ -7,6 +7,7 @@ struct cmdl_option {
 	const wchar_t* arg_alt;
 	const wchar_t* data_desc;
 	const wchar_t* desc;
+	const bool is_default;
 };
 
 std::unordered_map<const cmdl_option*, std::wstring> parse_cmdl(int argc, wchar_t* argv[], const cmdl_option* options[], size_t count);
