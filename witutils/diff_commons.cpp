@@ -11,15 +11,15 @@ const cmdl_option diff_cmdl::old_files { L"o",		L"old",			L"<filename>",	L"speci
 const cmdl_option diff_cmdl::recursive { L"r",		L"recursive",	nullptr,		L"search folder recursively" };
 const cmdl_option diff_cmdl::wcs_folder { nullptr,	L"wcs",			nullptr,		L"folder is Windows Component Store" };
 const cmdl_option diff_cmdl::out_file { L"O",		L"out",			L"<filename>",	L"output to file" };
-const cmdl_option * diff_cmdl::options[6] = { &show_help, &new_files, &old_files, &recursive, &wcs_folder, &out_file };
-const cmdl_option* diff_cmdl::default_option = &diff_cmdl::new_files;
+const cmdl_option * const diff_cmdl::options[6] = { &show_help, &new_files, &old_files, &recursive, &wcs_folder, &out_file };
+const cmdl_option * const diff_cmdl::default_option = &diff_cmdl::new_files;
 
-diff_params init_diff_params(int argc, wchar_t * argv[])
+diff_params init_diff_params(int argc, wchar_t * argv[], const std::wstring& default_file_pattern)
 {
-	return init_diff_params(parse_cmdl(argc, argv, diff_cmdl::options, diff_cmdl::default_option));
+	return init_diff_params(parse_cmdl(argc, argv, diff_cmdl::options, diff_cmdl::default_option), default_file_pattern);
 }
 
-diff_params init_diff_params(const options_data_t& options_data)
+diff_params init_diff_params(const options_data_t& options_data, const std::wstring& default_file_pattern)
 {
 	diff_params ret = {};
 
@@ -62,9 +62,9 @@ diff_params init_diff_params(const options_data_t& options_data)
 		const auto& files_pattern = is_new ? ret.new_files_pattern : ret.old_files_pattern;
 		fwprintf_s(ret.output_file, L" %ls files: %ls", is_new ? L"new" : L"old", files_pattern.c_str());
 		if (ret.is_wcs) {
-			file_groups = find_files_wcs_ex(files_pattern);
+			file_groups = find_files_wcs_ex(files_pattern, default_file_pattern);
 		} else {
-			file_groups = find_files_ex(files_pattern, ret.is_rec);
+			file_groups = find_files_ex(files_pattern, ret.is_rec, default_file_pattern);
 		}
 		fwprintf_s(ret.output_file, L"%ls\n", !file_groups.empty() ? L"" : L" (EMPTY!)");
 		return file_groups;

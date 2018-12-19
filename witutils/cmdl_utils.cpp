@@ -3,7 +3,7 @@
 
 using namespace std;
 
-options_data_t parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * options[], size_t count, const cmdl_option* default_option) {
+options_data_t parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * const options[], size_t count, const cmdl_option* const default_option) {
 	unordered_map<const cmdl_option*, wstring> ret;
 
 	for (int i = 1; i < argc; ++i) {
@@ -21,7 +21,7 @@ options_data_t parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * option
 					option = o;
 				}
 			}
-			
+
 			bool err = false;
 			if (option != nullptr) {
 				if (option->data_desc != nullptr) {
@@ -47,7 +47,7 @@ options_data_t parse_cmdl(int argc, wchar_t * argv[], const cmdl_option * option
 	return ret;
 }
 
-void print_cmdl_usage(const wchar_t * app, const cmdl_option * options[], size_t count, const cmdl_option* default_option) {
+void print_cmdl_usage(const wchar_t * app, const cmdl_option* const options[], size_t count, const cmdl_option* const default_option) {
 	wprintf_s(L" Usage: %ls [options]\n\n", app);
 	for (size_t i = 0; i < count; ++i) {
 		auto o = options[i];
@@ -57,7 +57,7 @@ void print_cmdl_usage(const wchar_t * app, const cmdl_option * options[], size_t
 			wprintf_s(L" ");
 		}
 
-		int len = 0;
+		size_t len = 0;
 		if (o->arg_alt != nullptr) {
 			len = wcslen(o->arg_alt);
 			wprintf_s(L"\t--%ls", o->arg_alt);
