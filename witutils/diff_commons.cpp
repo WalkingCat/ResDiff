@@ -74,6 +74,7 @@ diff_params init_diff_params(const options_data_t& options_data, const std::wstr
 	ret.old_file_groups = search_files(false);
 	if (ret.new_file_groups.empty() && ret.old_file_groups.empty()) {
 		ret.error = L"nothing to do";
+		ret.show_help = true;
 	} else {
 		if (!(ret.is_wcs || ret.is_rec)) {
 			auto& new_files = ret.new_file_groups[wstring()], &old_files = ret.old_file_groups[wstring()];
