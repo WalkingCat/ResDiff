@@ -20,7 +20,7 @@ int wmain(int argc, wchar_t* argv[])
 		return 0;
 	}
 
-	auto out = params.output_file;
+	auto out = params.out;
 	fwprintf_s(out, L"\n diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
 
 	const map<wstring, wstring> empty_files;
