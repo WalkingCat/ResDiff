@@ -3,7 +3,7 @@
 
 using namespace std;
 
-void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string);
+void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string, bool only_diff = false);
 void diff_string_maps(FILE* out, const map<wstring, wstring> & new_map, const map<wstring, wstring> & old_map);
 
 int wmain(int argc, wchar_t* argv[])
@@ -20,7 +20,7 @@ int wmain(int argc, wchar_t* argv[])
 		return 0;
 	}
 
-	auto out = params.output_file;
+	auto out = params.out;
 	fwprintf_s(out, L"\n diff legends: +: added, -: removed, *: changed, $: changed (original)\n");
 
 	const map<wstring, wstring> empty_files;
@@ -110,6 +110,19 @@ int wmain(int argc, wchar_t* argv[])
 													}
 												);
 											}
+										} else if ((type_name == L"500")) {
+											auto u8to16 = [](const char* s, size_t s_len) -> wstring {
+												wstring_convert<codecvt_utf8_utf16<wchar_t>> conv;
+												try {
+													return conv.from_bytes(s, s + s_len);
+												} catch(...) {
+													return wstring();
+												}
+											};
+											diff_strings(out, wstring(),
+												new_data ? &u8to16(reinterpret_cast<const char*>(new_data->data()), new_data->size()) : nullptr,
+												old_data ? &u8to16(reinterpret_cast<const char*>(old_data->data()), old_data->size()) : nullptr,
+												true);
 										}
 									}
 								}
@@ -153,7 +166,7 @@ vector<wstring> get_lines(const wstring& str) {
 	return ret;
 }
 
-void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string) {
+void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const wstring* old_string, bool only_diff) {
 	if (new_string != nullptr) {
 		if (old_string != nullptr) {
 			if ((*new_string) != (*old_string)) {
@@ -163,7 +176,9 @@ void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const
 						[&](const wstring* new_line, const wstring* old_line) {
 							if (new_line && old_line) {
 								if (wcscmp(new_line->c_str(), old_line->c_str()) == 0) {
-									fwprintf_s(out, L"           %ls\n", new_line->c_str());
+									if (!only_diff) {
+										fwprintf_s(out, L"           %ls\n", new_line->c_str());
+									}
 								} else {
 									fwprintf_s(out, L"         * %ls\n", new_line->c_str());
 									fwprintf_s(out, L"         $ %ls\n", old_line->c_str());
@@ -181,24 +196,28 @@ void diff_strings(FILE* out, const wstring& id, const wstring* new_string, const
 				}
 			}
 		} else {
-			if (is_multiline(*new_string)) {
-				fwprintf_s(out, L"       + %ls\n", id.c_str());
-				for (const auto& line : get_lines(*new_string)) {
-					fwprintf_s(out, L"         + %ls\n", line.c_str());
+			if (!only_diff) {
+				if (is_multiline(*new_string)) {
+					fwprintf_s(out, L"       + %ls\n", id.c_str());
+					for (const auto& line : get_lines(*new_string)) {
+						fwprintf_s(out, L"         + %ls\n", line.c_str());
+					}
+				} else {
+					fwprintf_s(out, L"       + %ls %ls\n", id.c_str(), new_string->c_str());
 				}
-			} else {
-				fwprintf_s(out, L"       + %ls %ls\n", id.c_str(), new_string->c_str());
 			}
 		}
 	} else if (old_string != nullptr) {
-		if (is_multiline(*old_string)) {
-			fwprintf_s(out, L"       - %ls\n", id.c_str());
-			for (const auto& line : get_lines(*old_string)) {
-				fwprintf_s(out, L"         - %ls\n", line.c_str());
-			}
+		if (!only_diff) {
+			if (is_multiline(*old_string)) {
+				fwprintf_s(out, L"       - %ls\n", id.c_str());
+				for (const auto& line : get_lines(*old_string)) {
+					fwprintf_s(out, L"         - %ls\n", line.c_str());
+				}
 
-		} else {
-			fwprintf_s(out, L"       - %ls %ls\n", id.c_str(), old_string->c_str());
+			} else {
+				fwprintf_s(out, L"       - %ls %ls\n", id.c_str(), old_string->c_str());
+			}
 		}
 	}
 }

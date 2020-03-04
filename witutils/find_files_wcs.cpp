@@ -81,7 +81,7 @@ wstring generate_key_from_manifest(const wstring_view parent, const wstring_view
 			CreateXmlReaderInputWithEncodingCodePage(stream, nullptr, CP_UTF8, TRUE, nullptr, &xml_reader_input);
 			if (xml_reader_input) {
 				xml_reader->SetInput(xml_reader_input);
-				XmlNodeType node_type;
+				XmlNodeType node_type = XmlNodeType::XmlNodeType_None;
 				while (SUCCEEDED(xml_reader->Read(&node_type))) {
 					if (node_type == XmlNodeType_Element) {
 						const wchar_t* elem_name = nullptr;

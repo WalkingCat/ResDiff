@@ -27,5 +27,5 @@ struct diff_params {
 	std::map<std::wstring, std::map<std::wstring, std::wstring>> old_file_groups;
 };
 
-diff_params init_diff_params(int argc, wchar_t* argv[], const std::wstring& default_file_pattern = L"*");
-diff_params init_diff_params(const options_data_t& options_data, const std::wstring& default_file_pattern = L"*");
+diff_params init_diff_params(int argc, wchar_t* argv[], const std::wstring_view default_file_pattern = L"*");
+diff_params init_diff_params(const options_data_t& options_data, const std::wstring_view default_file_pattern = L"*");

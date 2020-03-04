@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <memory>
 #include <map>
+#include <codecvt>
 
 #include "../witutils/diff_utils.h"
 #include "../witutils/diff_commons.h"

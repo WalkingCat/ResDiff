@@ -2,25 +2,26 @@
 #include "diff_commons.h"
 #include "find_files.h"
 #include "find_files_wcs.h"
+#include "str_utils.h"
 
 using namespace std;
 
 constexpr cmdl_option diff_cmdl::show_help{ L"?",		L"help",		nullptr,		L"show this help" };
 constexpr cmdl_option diff_cmdl::new_files{ L"n",		L"new",			L"<filename>",	L"specify new file(s)" };
 constexpr cmdl_option diff_cmdl::old_files{ L"o",		L"old",			L"<filename>",	L"specify old file(s)" };
-constexpr cmdl_option diff_cmdl::filter{ L"f",			L"filter",		L"<text>",		L"path filter" };
+constexpr cmdl_option diff_cmdl::filter{	L"f",		L"filter",		L"<text>",		L"path filter" };
 constexpr cmdl_option diff_cmdl::recursive{ L"r",		L"recursive",	nullptr,		L"search folder recursively" };
 constexpr cmdl_option diff_cmdl::wcs_folder{ nullptr,	L"wcs",			nullptr,		L"folder is Windows Component Store" };
-constexpr cmdl_option diff_cmdl::out_file{ L"O",		L"out",			L"<filename>",	L"output to file" };
+constexpr cmdl_option diff_cmdl::out_file{	L"O",		L"out",			L"<filename>",	L"output to file" };
 constexpr const cmdl_option* diff_cmdl::options[7] = { &show_help, &new_files, &old_files, &filter, &recursive, &wcs_folder, &out_file };
 constexpr const cmdl_option* diff_cmdl::default_option = &diff_cmdl::new_files;
 
-diff_params init_diff_params(int argc, wchar_t* argv[], const std::wstring& default_file_pattern)
+diff_params init_diff_params(int argc, wchar_t* argv[], const std::wstring_view default_file_pattern)
 {
 	return init_diff_params(parse_cmdl(argc, argv, diff_cmdl::options, diff_cmdl::default_option), default_file_pattern);
 }
 
-diff_params init_diff_params(const options_data_t& options_data, const std::wstring& default_file_pattern)
+diff_params init_diff_params(const options_data_t& options_data, const std::wstring_view default_file_pattern)
 {
 	diff_params ret = {};
 
@@ -41,10 +42,7 @@ diff_params init_diff_params(const options_data_t& options_data, const std::wstr
 	}
 	opt_it = options_data.find(&diff_cmdl::filter);
 	if (opt_it != options_data.end()) {
-		ret.path_filter = opt_it->second;
-		for (auto& c : ret.path_filter) {
-			c = std::tolower(c);
-		}
+		ret.path_filter = tolower(opt_it->second);
 	}
 	opt_it = options_data.find(&diff_cmdl::out_file);
 	if (opt_it != options_data.end()) {
@@ -64,7 +62,7 @@ diff_params init_diff_params(const options_data_t& options_data, const std::wstr
 	} else {
 		ret.out = stdout;
 	}
-	
+
 	auto search_files = [&](auto is_new) -> map<wstring, map<wstring, wstring>> {
 		map<wstring, map<wstring, wstring>> file_groups;
 		const auto& files_pattern = decltype(is_new)::value ? ret.new_files_pattern : ret.old_files_pattern;
